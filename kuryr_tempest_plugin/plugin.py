@@ -34,4 +34,4 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                           group='service_available')
 
     def get_opt_lists(self):
-        return [('service_available', [project_config.__service_option])]
+        return [('service_available', [project_config.service_option])]
