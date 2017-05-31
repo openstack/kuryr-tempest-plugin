@@ -13,19 +13,18 @@
 # limitations under the License.
 
 
-"""
-test_kuryr_tempest_plugin
-----------------------------------
-
-Tests for `kuryr_tempest_plugin` module.
-"""
-
 from tempest.lib import decorators
 
 from kuryr_tempest_plugin.tests import base
 
-class TestKuryr_tempest_plugin(base.BaseKuryrTest):
 
-    @decorators.idempotent_id('14990abd-76b4-476e-add2-321437d8cec5')
-    def test_something(self):
-        pass
+class PodTest(base.BaseKuryrTest):
+
+    def _list_pods(self):
+        pods = self.k8s_client.list_pod_for_all_namespaces(watch=False)
+        return pods
+
+    @decorators.idempotent_id('f96b40a8-25bc-4ddd-a862-072a2b7b80b8')
+    def test_list_pods(self):
+        pods = self._list_pods()
+        self.assertEmpty(pods.items)
