@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from tempest import config
-from tempest.lib import excpetions
 import tempest.test
 
 CONF = config.CONF
@@ -22,8 +21,6 @@ CONF = config.CONF
 class BaseKuryrTest(tempest.test.BaseTestCase):
 
     credentials = ['primary']
-
-    client_manager = clients.Manager
 
     @classmethod
     def skip_checks(cls):

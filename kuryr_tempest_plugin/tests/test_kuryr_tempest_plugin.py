@@ -24,8 +24,7 @@ from tempest.lib import decorators
 
 from kuryr_tempest_plugin.tests import base
 
-
-class TestKuryr_tempest_plugin(base.TestCase):
+class TestKuryr_tempest_plugin(base.BaseKuryrTest):
 
     @decorators.idempotent_id('8abf6dec-37b9-43ca-95cf-b8ebecda3c8d')
     def test_something(self):
