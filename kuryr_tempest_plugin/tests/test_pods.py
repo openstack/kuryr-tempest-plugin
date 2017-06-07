@@ -13,12 +13,15 @@
 # limitations under the License.
 
 
+from oslo_log import log as logging
 from tempest.lib import decorators
+from tempest.lib.common.utils import data_utils
 
 from kuryr_tempest_plugin.tests import base
 
 from oslo_config import cfg
 
+LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
 
 
@@ -28,7 +31,40 @@ class PodTest(base.BaseAdminKuryrTest):
         pods = self.k8s_client.list_pod_for_all_namespaces(watch=False)
         return pods
 
+    def _delete_pod(self, pod_name, body=None, namespace='default'):
+        if body is None:
+            body = {}
+        self.k8s_client.delete_namespaced_pod(name=pod_name,
+                                              body=body,
+                                              namespace=namespace)
+
     @decorators.idempotent_id('f96b40a8-25bc-4ddd-a862-072a2b7b80b8')
     def test_list_pods(self):
         pods = self._list_pods()
         self.assertEmpty(pods.items)
+
+    @decorators.idempotent_id('b6fbd21a-d7cb-497d-b03b-02e09cc2caf8')
+    def test_create_pod(self):
+        pod_name = data_utils.rand_name('pod')
+        pod_manifest = {
+            'apiVersion': 'v1',
+            'kind': 'Pod',
+            'metadata':
+            {
+                'name': pod_name
+            },
+            'spec': {
+                'containers': [{
+                    'image': 'busybox',
+                    'name': 'sleep',
+                    "args": [
+                        "/bin/sh",
+                        "-c",
+                        "while true; do date; sleep 5; done"
+                    ]
+                }]
+            }
+        }
+        self.k8s_client.create_namespaced_pod(body=pod_manifest,
+                                              namespace='default')
+        self.addCleanup(self._delete_pod, pod_name)
