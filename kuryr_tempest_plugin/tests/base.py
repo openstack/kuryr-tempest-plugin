@@ -14,25 +14,23 @@
 
 import kubernetes
 
+from tempest.api.network import base
 from tempest import config
-import tempest.test
 
 CONF = config.CONF
 
 
-class BaseKuryrTest(tempest.test.BaseTestCase):
-
-    credentials = ['primary']
+class BaseAdminKuryrTest(base.BaseAdminNetworkTest):
 
     @classmethod
     def skip_checks(cls):
-        super(BaseKuryrTest, cls).skip_checks()
+        super(BaseAdminKuryrTest, cls).skip_checks()
         if not CONF.service_available.kuryr:
             raise cls.skipException('Kuryr support is required')
 
     @classmethod
     def resource_setup(cls):
-        super(BaseKuryrTest, cls).resource_setup()
+        super(BaseAdminKuryrTest, cls).resource_setup()
         # TODO (dmellado): Config k8s client in a cleaner way
         kubernetes.config.load_kube_config()
         cls.k8s_client = kubernetes.client.CoreV1Api()

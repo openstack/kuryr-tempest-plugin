@@ -17,8 +17,12 @@ from tempest.lib import decorators
 
 from kuryr_tempest_plugin.tests import base
 
+from oslo_config import cfg
 
-class PodTest(base.BaseKuryrTest):
+CONF = cfg.CONF
+
+
+class PodTest(base.BaseAdminKuryrTest):
 
     def _list_pods(self):
         pods = self.k8s_client.list_pod_for_all_namespaces(watch=False)
