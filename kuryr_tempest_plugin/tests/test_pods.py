@@ -38,6 +38,7 @@ class PodTest(base.BaseAdminKuryrTest):
                                               body=body,
                                               namespace=namespace)
 
+    @decorators.skip_because(bug="1700993")
     @decorators.idempotent_id('f96b40a8-25bc-4ddd-a862-072a2b7b80b8')
     def test_list_pods(self):
         pods = self._list_pods()
