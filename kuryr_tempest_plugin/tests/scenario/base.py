@@ -57,13 +57,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         pod = self.k8s_client.V1Pod()
         pod.metadata = self.k8s_client.V1ObjectMeta(name=name)
 
-        container = self.k8s_client.V1Container()
+        container = self.k8s_client.V1Container(name=name)
         container.image = image
         container.args = ["sleep", "3600"]
-        container.name = name
 
-        spec = self.k8s_client.V1PodSpec()
-        spec.containers = [container]
+        spec = self.k8s_client.V1PodSpec(containers=[container])
 
         pod.spec = spec
         self.k8s_client.CoreV1Api().create_namespaced_pod(namespace=namespace,
