@@ -16,6 +16,7 @@ import time
 
 from kubernetes import client as k8s_client
 from kubernetes import config as k8s_config
+from kubernetes.stream import stream
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -103,6 +104,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         for port in port_list['ports']:
             if pod_name == port['name']:
                 return port
+
+    def exec_command_in_pod(self, pod_name, command, namespace="default"):
+        api = self.k8s_client.CoreV1Api()
+        return stream(api.connect_get_namespaced_pod_exec, pod_name, namespace,
+                      command=command, stderr=False, stdin=False, stdout=True,
+                      tty=False)
 
     def assign_fip_to_pod(self, pod_name, namespace="default"):
         ext_net_id = CONF.network.public_network_id

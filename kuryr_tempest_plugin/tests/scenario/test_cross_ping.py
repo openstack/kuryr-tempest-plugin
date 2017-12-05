@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -63,3 +65,18 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
             self.assertEqual('0', result.rstrip('\n'))
         except exceptions.SSHExecCommandFailed:
             LOG.error("Couldn't ping server")
+
+    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a2a9')
+    def test_pod_pod_ping(self):
+        pod_name_list, pod_fip_list = [], []
+        for i in range(2):
+            pod_name, pod = self.create_pod()
+            self.addCleanup(self.delete_pod, pod_name, pod)
+            pod_name_list.append(pod_name)
+            pod_fip_list.append(self.assign_fip_to_pod(pod_name))
+
+        cmd = [
+            "/bin/sh", "-c", "ping -c 1 {dst_ip}>/dev/null ; echo $?".format(
+                dst_ip=pod_fip_list[1]['floatingip']['floating_ip_address'])]
+        time.sleep(20)
+        self.assertEqual(self.exec_command_in_pod(pod_name_list[0], cmd), '0')
