@@ -31,6 +31,6 @@ class BaseAdminKuryrTest(base.BaseAdminNetworkTest):
     @classmethod
     def resource_setup(cls):
         super(BaseAdminKuryrTest, cls).resource_setup()
-        # TODO (dmellado): Config k8s client in a cleaner way
+        # TODO(dmellado): Config k8s client in a cleaner way
         kubernetes.config.load_kube_config()
         cls.k8s_client = kubernetes.client.CoreV1Api()

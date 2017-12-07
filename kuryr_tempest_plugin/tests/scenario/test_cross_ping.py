@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import testtools
-
 from oslo_log import log as logging
 from tempest import config
+from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
-from tempest.lib.common.utils import data_utils
 
 from kuryr_tempest_plugin.tests.scenario import base
 
@@ -61,6 +59,7 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
                        'from host "%s" to "%s".' % (
                            fip['floating_ip_address'],
                            pod_fip['floatingip']['floating_ip_address']))
+                LOG.error(msg)
             self.assertEqual('0', result.rstrip('\n'))
         except exceptions.SSHExecCommandFailed:
             LOG.error("Couldn't ping server")

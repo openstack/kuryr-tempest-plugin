@@ -17,9 +17,9 @@ import time
 from kubernetes import client as k8s_client
 from kubernetes import config as k8s_config
 
-from tempest.scenario import manager
-from tempest.lib.common.utils import data_utils
 from tempest import config
+from tempest.lib.common.utils import data_utils
+from tempest.scenario import manager
 
 CONF = config.CONF
 
@@ -41,7 +41,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def resource_setup(cls):
         super(BaseKuryrScenarioTest, cls).resource_setup()
         cls.pod_fips = []
-        # TODO (dmellado): Config k8s client in a cleaner way
+        # TODO(dmellado): Config k8s client in a cleaner way
         k8s_config.load_kube_config()
 
     @classmethod
@@ -68,7 +68,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                                           body=pod)
         status = ""
         while status != "Running":
-            # TODO (dmellado) add timeout config to tempest plugin
+            # TODO(dmellado) add timeout config to tempest plugin
             time.sleep(1)
             status = self.get_pod_status(name, namespace)
 
