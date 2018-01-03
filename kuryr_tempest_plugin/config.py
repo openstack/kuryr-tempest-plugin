@@ -19,3 +19,13 @@ service_option = cfg.BoolOpt("kuryr",
                              default=True,
                              help="Whether or not kuryr is expected to be "
                                   "available")
+
+ports_pool_batch = cfg.IntOpt("ports_pool_batch",
+                              default=10,
+                              help="The size of pool batch when "
+                                   "KURYR_USE_PORT_POOLS is enabled")
+
+port_pool_enabled = cfg.BoolOpt("port_pool_enabled",
+                                default=False,
+                                help="Whether or not port pool feature is "
+                                     "enabled")

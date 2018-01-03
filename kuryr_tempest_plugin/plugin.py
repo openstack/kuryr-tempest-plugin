@@ -32,6 +32,12 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
     def register_opts(self, conf):
         conf.register_opt(project_config.service_option,
                           group='service_available')
+        conf.register_opt(project_config.ports_pool_batch,
+                          group='vif_pool')
+        conf.register_opt(project_config.port_pool_enabled,
+                          group='kuryr_kubernetes')
 
     def get_opt_lists(self):
-        return [('service_available', [project_config.service_option])]
+        return [('service_available', [project_config.service_option]),
+                ('kuryr_kubernetes', [project_config.port_pool_enabled]),
+                ('vif_pool', [project_config.ports_pool_batch])]
