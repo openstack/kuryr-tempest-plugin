@@ -38,14 +38,8 @@ class PodTest(base.BaseAdminKuryrTest):
                                               body=body,
                                               namespace=namespace)
 
-    @decorators.skip_because(bug="1700993")
-    @decorators.idempotent_id('f96b40a8-25bc-4ddd-a862-072a2b7b80b8')
-    def test_list_pods(self):
-        pods = self._list_pods()
-        self.assertEmpty(pods.items)
-
     @decorators.idempotent_id('b6fbd21a-d7cb-497d-b03b-02e09cc2caf8')
-    def test_create_pod(self):
+    def test_create_list_pod(self):
         pod_name = data_utils.rand_name('pod')
         pod_manifest = {
             'apiVersion': 'v1',
@@ -68,4 +62,6 @@ class PodTest(base.BaseAdminKuryrTest):
         }
         self.k8s_client.create_namespaced_pod(body=pod_manifest,
                                               namespace='default')
+        pod_names = [pod.metadata.name for pod in self._list_pods().items]
+        self.assertIn(pod_name, pod_names)
         self.addCleanup(self._delete_pod, pod_name)
