@@ -52,7 +52,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.os_admin.floating_ips_client.delete_floatingip(
                 fip['floatingip']['id'])
 
-    def create_pod(self, name=None, image='celebdor/kuryr-demo',
+    def create_pod(self, name=None, image='kuryr/demo',
                    namespace="default"):
         name = data_utils.rand_name(prefix='kuryr-pod')
         pod = self.k8s_client.V1Pod()
