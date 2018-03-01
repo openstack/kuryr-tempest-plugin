@@ -49,6 +49,7 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
         self.addCleanup(self.delete_pod, pod_name, pod)
         pod_fip = self.assign_fip_to_pod(pod_name)
 
+        # check connectivity from VM to Pod
         ssh_client = self.get_remote_client(fip['floating_ip_address'],
                                             private_key=keypair['private_key'])
         cmd = ("ping -c1 -w1 %s &> /dev/null; echo $?" %
@@ -65,6 +66,12 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
             self.assertEqual('0', result.rstrip('\n'))
         except exceptions.SSHExecCommandFailed:
             LOG.error("Couldn't ping server")
+
+        # check connectivity from Pod to VM
+        cmd = [
+            "/bin/sh", "-c", "ping -c 1 {dst_ip}>/dev/null ; echo $?".format(
+                dst_ip=fip['floating_ip_address'])]
+        self.assertEqual(self.exec_command_in_pod(pod_name, cmd), '0')
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a2a9')
     def test_pod_pod_ping(self):
