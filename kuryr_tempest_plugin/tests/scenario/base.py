@@ -100,10 +100,22 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def get_pod_port(self, pod_name, namespace="default"):
         # TODO(gcheresh) get pod port using container id, as kuryr this would
         # depend on port_debug kuryr feature
+        full_port_name = str(namespace) + "/" + str(pod_name)
         port_list = self.os_admin.ports_client.list_ports()
+        found_ports = []
         for port in port_list['ports']:
-            if pod_name == port['name']:
+            if full_port_name == port['name']:
                 return port
+            if pod_name == port['name']:
+                found_ports.append(port)
+        # To maintain backwards compatibility with the old naming we also check
+        # for matchings without namespace at the port name.
+        # Note, if there is more than one port with the same name, we have no
+        # way to differentiate them unless the namespace is used at the port
+        # name, since kubernetes will avoid having pods with the same name
+        # under the same namespace
+        if len(found_ports) == 1:
+            return found_ports[0]
 
     def exec_command_in_pod(self, pod_name, command, namespace="default"):
         api = self.k8s_client.CoreV1Api()
