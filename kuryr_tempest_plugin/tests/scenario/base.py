@@ -271,3 +271,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return cls.k8s_client.CustomObjectsApi().get_cluster_custom_object(
             group=KURYR_NET_CRD_GROUP, version=KURYR_NET_CRD_VERSION,
             plural=KURYR_NET_CRD_PLURAL, name=name)
+
+    def get_pod_name_list(self, namespace="default"):
+        return [pod.metadata.name for pod in
+                self.k8s_client.CoreV1Api().list_namespaced_pod(
+                    namespace=namespace).items]
