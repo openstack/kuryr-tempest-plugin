@@ -35,3 +35,5 @@
         - kuryr-kubernetes-tempest-multinode-lbaasv2
         - kuryr-kubernetes-tempest-octavia-centos-7
         - kuryr-kubernetes-tempest-lbaasv2-centos-7
+        - kuryr-kubernetes-tempest-containerized-lbaasv2
+        - kuryr-kubernetes-tempest-daemon-pools-lbaasv2
