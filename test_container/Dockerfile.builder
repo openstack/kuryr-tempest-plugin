@@ -170,3 +170,5 @@ RUN mkdir -p rootfs/usr/bin; \
 
 ADD ./server.go .
 RUN go build -ldflags "-linkmode external -extldflags -static" -o rootfs/usr/bin/helloserver server.go
+RUN mkdir -p rootfs/etc/ssl/certs \
+	&& cp /etc/ssl/certs/ca-certificates.crt rootfs/etc/ssl/certs/ca-certificates.crt

@@ -3,6 +3,8 @@
 BUILDER_NAME=$(uuidgen)
 docker build -t kuryr/demo_builder . -f Dockerfile.builder
 docker run --name ${BUILDER_NAME} kuryr/demo_builder
+rm -fr rootfs
+rm -fr rootfs.tar.xz
 docker cp ${BUILDER_NAME}:/usr/src/busybox/rootfs rootfs
 docker rm ${BUILDER_NAME}
 
