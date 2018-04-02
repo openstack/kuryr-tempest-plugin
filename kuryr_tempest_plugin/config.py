@@ -29,3 +29,7 @@ port_pool_enabled = cfg.BoolOpt("port_pool_enabled",
                                 default=False,
                                 help="Whether or not port pool feature is "
                                      "enabled")
+
+lb_build_timeout = cfg.IntOpt("lb_build_timeout",
+                              default=900,
+                              help="The max time it should take to create LB")
