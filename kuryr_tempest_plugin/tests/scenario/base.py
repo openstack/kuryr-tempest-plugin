@@ -58,47 +58,51 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.os_admin.floating_ips_client.delete_floatingip(
                 fip['floatingip']['id'])
 
-    def create_pod(self, name=None, labels=None, image='kuryr/demo',
+    @classmethod
+    def create_pod(cls, name=None, labels=None, image='kuryr/demo',
                    namespace="default"):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-pod')
-        pod = self.k8s_client.V1Pod()
-        pod.metadata = self.k8s_client.V1ObjectMeta(name=name, labels=labels)
+        pod = cls.k8s_client.V1Pod()
+        pod.metadata = cls.k8s_client.V1ObjectMeta(name=name, labels=labels)
 
-        container = self.k8s_client.V1Container(name=name)
+        container = cls.k8s_client.V1Container(name=name)
         container.image = image
         container.args = ["sleep", "3600"]
 
-        spec = self.k8s_client.V1PodSpec(containers=[container])
+        spec = cls.k8s_client.V1PodSpec(containers=[container])
 
         pod.spec = spec
-        self.k8s_client.CoreV1Api().create_namespaced_pod(namespace=namespace,
-                                                          body=pod)
+        cls.k8s_client.CoreV1Api().create_namespaced_pod(namespace=namespace,
+                                                         body=pod)
         status = ""
         while status != "Running":
             # TODO(dmellado) add timeout config to tempest plugin
             time.sleep(1)
-            status = self.get_pod_status(name, namespace)
+            status = cls.get_pod_status(name, namespace)
 
         return name, pod
 
-    def delete_pod(self, pod_name, body=None, namespace="default"):
+    @classmethod
+    def delete_pod(cls, pod_name, body=None, namespace="default"):
         if body is None:
             body = {}
-        self.k8s_client.CoreV1Api().delete_namespaced_pod(
+        cls.k8s_client.CoreV1Api().delete_namespaced_pod(
             name=pod_name,
             body=body,
             namespace=namespace)
 
-    def get_pod_ip(self, pod_name, namespace="default"):
-        pod_list = self.k8s_client.CoreV1Api().list_namespaced_pod(
+    @classmethod
+    def get_pod_ip(cls, pod_name, namespace="default"):
+        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
             namespace=namespace)
         for pod in pod_list.items:
             if pod.metadata.name == pod_name:
                 return pod.status.pod_ip
 
-    def get_pod_status(self, pod_name, namespace="default"):
-        pod_list = self.k8s_client.CoreV1Api().list_namespaced_pod(
+    @classmethod
+    def get_pod_status(cls, pod_name, namespace="default"):
+        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
             namespace=namespace)
         for pod in pod_list.items:
             if pod.metadata.name == pod_name:
@@ -145,18 +149,19 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             if project_name == project['name']:
                 return project['id']
 
-    def create_service(self, pod_label, service_name=None, api_version="v1",
+    @classmethod
+    def create_service(cls, pod_label, service_name=None, api_version="v1",
                        kind=None, protocol="TCP", port=80, target_port=8080,
                        spec_type='ClusterIP', namespace="default"):
         if not service_name:
             service_name = data_utils.rand_name(prefix='kuryr-service')
-        service = self.k8s_client.V1Service()
+        service = cls.k8s_client.V1Service()
         service.api_version = api_version
         service.kind = kind
-        service.metadata = self.k8s_client.V1ObjectMeta(name=service_name)
+        service.metadata = cls.k8s_client.V1ObjectMeta(name=service_name)
 
-        spec = self.k8s_client.V1ServiceSpec()
-        spec.ports = [self.k8s_client.V1ServicePort(
+        spec = cls.k8s_client.V1ServiceSpec()
+        spec.ports = [cls.k8s_client.V1ServicePort(
             protocol=protocol,
             port=port,
             target_port=target_port)]
@@ -164,19 +169,20 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         spec.type = spec_type
 
         service.spec = spec
-        service_obj = self.k8s_client.CoreV1Api().create_namespaced_service(
+        service_obj = cls.k8s_client.CoreV1Api().create_namespaced_service(
             namespace=namespace, body=service)
-        self.addCleanup(self.delete_service, service_name)
         return service_name, service_obj
 
-    def delete_service(self, service_name, namespace="default"):
-        self.k8s_client.CoreV1Api().delete_namespaced_service(
+    @classmethod
+    def delete_service(cls, service_name, namespace="default"):
+        cls.k8s_client.CoreV1Api().delete_namespaced_service(
             name=service_name,
             namespace=namespace)
 
+    @classmethod
     def get_service_ip(
-            self, service_name, spec_type="ClusterIP", namespace="default"):
-        api = self.k8s_client.CoreV1Api()
+            cls, service_name, spec_type="ClusterIP", namespace="default"):
+        api = cls.k8s_client.CoreV1Api()
         while True:
             time.sleep(5)
             service = api.read_namespaced_service(service_name, namespace)
@@ -188,17 +194,32 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             else:
                 raise lib_exc.NotImplemented()
 
-    def wait_service_status(self, service_ip, timeout_period):
+    @classmethod
+    def wait_service_status(cls, service_ip, timeout_period):
         session = requests.Session()
         start = time.time()
         while time.time() - start < timeout_period:
             try:
+                time.sleep(5)
                 session.get("http://{0}".format(service_ip), timeout=2)
-                time.sleep(1)
                 return
             except Exception:
                 LOG.warning('No initial traffic is passing through.')
-                time.sleep(1)
+                time.sleep(5)
         LOG.error(
             "Traffic didn't pass within the period of %s" % timeout_period)
         raise lib_exc.ServerFault()
+
+    @classmethod
+    def create_setup_for_service_test(cls, pod_num=2):
+        for i in range(pod_num):
+            pod_name, pod = cls.create_pod(
+                labels={"app": 'pod-label'}, image='celebdor/kuryr-demo')
+            cls.addClassResourceCleanup(cls.delete_pod, pod_name)
+        service_name, service_obj = cls.create_service(
+            pod_label=pod.metadata.labels)
+        cls.service_ip = cls.get_service_ip(service_name)
+        cls.wait_service_status(
+            cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
+
+        cls.addClassResourceCleanup(cls.delete_service, service_name)

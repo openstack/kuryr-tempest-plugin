@@ -18,6 +18,7 @@ import subprocess
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
+from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
 
@@ -33,27 +34,37 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         if not CONF.network_feature_enabled.floating_ips:
             raise cls.skipException("Floating ips are not available")
 
+    @classmethod
+    def resource_setup(cls):
+        super(TestServiceScenario, cls).resource_setup()
+        cls.create_setup_for_service_test()
+
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
-        pod = None
         cmd_output_list = list()
-        for i in range(2):
-            pod_name, pod = self.create_pod(
-                labels={"app": 'pod-label'}, image='celebdor/kuryr-demo')
-            self.addCleanup(self.delete_pod, pod_name, pod)
-        service_name, service_obj = self.create_service(
-            pod_label=pod.metadata.labels)
-
-        service_ip = self.get_service_ip(service_name)
-        self.wait_service_status(
-            service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
-        LOG.info("Trying to curl the service load balancer IP %s" % service_ip)
-        cmd = "curl {dst_ip}".format(dst_ip=service_ip)
+        LOG.info("Trying to curl the service IP %s" % self.service_ip)
+        cmd = "curl {dst_ip}".format(dst_ip=self.service_ip)
         for i in range(2):
             try:
                 cmd_output_list.append(
                     subprocess.check_output(shlex.split(cmd)))
             except subprocess.CalledProcessError:
-                LOG.error("Checking output of curl the service load balancer "
-                          "IP %s failed" % service_ip)
-                raise
+                LOG.error("Checking output of curl to the service IP %s "
+                          "failed" % self.service_ip)
+                raise lib_exc.UnexpectedResponseCode()
+        self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
+
+    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
+    def test_pod_service_curl(self):
+        cmd_output_list = list()
+        pod_name, pod = self.create_pod()
+        self.addCleanup(self.delete_pod, pod_name)
+        cmd = [
+            "/bin/sh", "-c", "curl {dst_ip}".format(dst_ip=self.service_ip)]
+        for i in range(2):
+            cmd_output_list.append(self.exec_command_in_pod(pod_name, cmd))
+            # check if the curl command succeeded
+            if not cmd_output_list[i]:
+                LOG.error("Curl the service IP %s failed" % self.service_ip)
+                raise lib_exc.UnexpectedResponseCode()
+        self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
