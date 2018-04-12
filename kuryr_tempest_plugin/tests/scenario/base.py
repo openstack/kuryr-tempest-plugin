@@ -175,9 +175,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def delete_service(cls, service_name, namespace="default"):
+        delete_options = cls.k8s_client.V1DeleteOptions()
         cls.k8s_client.CoreV1Api().delete_namespaced_service(
             name=service_name,
-            namespace=namespace)
+            namespace=namespace,
+            body=delete_options)
 
     @classmethod
     def get_service_ip(
