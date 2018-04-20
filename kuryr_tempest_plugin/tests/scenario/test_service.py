@@ -33,7 +33,6 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         if not CONF.network_feature_enabled.floating_ips:
             raise cls.skipException("Floating ips are not available")
 
-    @decorators.skip_because(bug="1763045")
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
         pod = None
