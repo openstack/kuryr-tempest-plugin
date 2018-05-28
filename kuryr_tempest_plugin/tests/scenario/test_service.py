@@ -68,3 +68,32 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
                 LOG.error("Curl the service IP %s failed" % self.service_ip)
                 raise lib_exc.UnexpectedResponseCode()
         self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
+
+
+class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
+
+    @classmethod
+    def skip_checks(cls):
+        super(TestLoadBalancerServiceScenario, cls).skip_checks()
+        if not CONF.network_feature_enabled.floating_ips:
+            raise cls.skipException("Floating ips are not available")
+
+    @classmethod
+    def resource_setup(cls):
+        super(TestLoadBalancerServiceScenario, cls).resource_setup()
+        cls.create_setup_for_service_test(spec_type="LoadBalancer")
+
+    @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
+    def test_lb_service_curl(self):
+        cmd_output_list = list()
+        LOG.info("Trying to curl the service IP %s" % self.service_ip)
+        cmd = "curl {dst_ip}".format(dst_ip=self.service_ip)
+        for i in range(2):
+            try:
+                cmd_output_list.append(
+                    subprocess.check_output(shlex.split(cmd)))
+            except subprocess.CalledProcessError:
+                LOG.error("Checking output of curl to the service IP %s "
+                          "failed" % self.service_ip)
+                raise lib_exc.UnexpectedResponseCode()
+        self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
