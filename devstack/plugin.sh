@@ -13,6 +13,7 @@ function install_kuryr_tempest_plugin {
 if [[ "$1" == "stack" && "$2" == "install" ]]; then
         echo_summary "Building kuryr/demo test container"
         build_test_container
+elif [[ "$1" == "stack" && "$2" == "test-config" ]]; then
         echo_summary "Installing Kuryr Tempest Plugin"
         install_kuryr_tempest_plugin
 fi
