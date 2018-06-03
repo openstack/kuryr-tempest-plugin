@@ -14,7 +14,6 @@
 
 from oslo_log import log as logging
 from tempest import config
-from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions
 
@@ -34,22 +33,13 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a1a8')
     def test_vm_pod_ping(self):
-        keypair = self.create_keypair()
-        security_groups = [
-            {'name': self._create_security_group()['name']}
-        ]
-        server = self.create_server(name=data_utils.rand_name(prefix='kuryr'),
-                                    key_name=keypair['name'],
-                                    security_groups=security_groups)
-        fip = self.create_floating_ip(server)
 
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name, pod)
         pod_fip = self.assign_fip_to_pod(pod_name)
+        ssh_client, fip = self.create_vm_for_connectivity_test()
 
         # check connectivity from VM to Pod
-        ssh_client = self.get_remote_client(fip['floating_ip_address'],
-                                            private_key=keypair['private_key'])
         cmd = ("ping -c4 -w4 %s &> /dev/null; echo $?" %
                pod_fip['floatingip']['floating_ip_address'])
 
@@ -67,15 +57,7 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a1a8')
     def test_pod_vm_ping(self):
-        keypair = self.create_keypair()
-        security_groups = [
-            {'name': self._create_security_group()['name']}
-        ]
-        server = self.create_server(name=data_utils.rand_name(prefix='kuryr'),
-                                    key_name=keypair['name'],
-                                    security_groups=security_groups)
-        fip = self.create_floating_ip(server)
-
+        _, fip = self.create_vm_for_connectivity_test()
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name, pod)
 
