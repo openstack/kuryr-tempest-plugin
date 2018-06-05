@@ -223,13 +223,13 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         raise lib_exc.ServerFault()
 
     @classmethod
-    def create_setup_for_service_test(cls, pod_num=2):
+    def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP"):
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
                 labels={"app": 'pod-label'}, image='celebdor/kuryr-demo')
             cls.addClassResourceCleanup(cls.delete_pod, pod_name)
         service_name, service_obj = cls.create_service(
-            pod_label=pod.metadata.labels)
+            pod_label=pod.metadata.labels, spec_type=spec_type)
         cls.service_ip = cls.get_service_ip(service_name)
         cls.wait_service_status(
             cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
