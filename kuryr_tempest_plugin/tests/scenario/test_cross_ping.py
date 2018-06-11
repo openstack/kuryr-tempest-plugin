@@ -52,7 +52,7 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
         # check connectivity from VM to Pod
         ssh_client = self.get_remote_client(fip['floating_ip_address'],
                                             private_key=keypair['private_key'])
-        cmd = ("ping -c1 -w1 %s &> /dev/null; echo $?" %
+        cmd = ("ping -c4 -w4 %s &> /dev/null; echo $?" %
                pod_fip['floatingip']['floating_ip_address'])
 
         try:
@@ -69,7 +69,7 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
 
         # check connectivity from Pod to VM
         cmd = [
-            "/bin/sh", "-c", "ping -c 1 {dst_ip}>/dev/null ; echo $?".format(
+            "/bin/sh", "-c", "ping -c 4 {dst_ip}>/dev/null ; echo $?".format(
                 dst_ip=fip['floating_ip_address'])]
         self.assertEqual(self.exec_command_in_pod(pod_name, cmd), '0')
 
@@ -83,7 +83,7 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
             pod_fip_list.append(self.assign_fip_to_pod(pod_name))
 
         cmd = [
-            "/bin/sh", "-c", "ping -c 1 {dst_ip}>/dev/null ; echo $?".format(
+            "/bin/sh", "-c", "ping -c 4 {dst_ip}>/dev/null ; echo $?".format(
                 dst_ip=pod_fip_list[1]['floatingip']['floating_ip_address'])]
         time.sleep(20)
         self.assertEqual(self.exec_command_in_pod(pod_name_list[0], cmd), '0')
