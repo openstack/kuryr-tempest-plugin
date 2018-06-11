@@ -31,6 +31,10 @@ from tempest.scenario import manager
 CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
+KURYR_NET_CRD_GROUP = 'openstack.org'
+KURYR_NET_CRD_VERSION = 'v1'
+KURYR_NET_CRD_PLURAL = 'kuryrnets'
+
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
@@ -235,3 +239,36 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
 
         cls.addClassResourceCleanup(cls.delete_service, service_name)
+
+    @classmethod
+    def create_namespace(cls, name=None):
+        if not name:
+            name = data_utils.rand_name(prefix='kuryr-namespace')
+        namespace = cls.k8s_client.V1Namespace()
+        namespace.metadata = cls.k8s_client.V1ObjectMeta(name=name)
+        namespace_obj = cls.k8s_client.CoreV1Api().create_namespace(
+            body=namespace)
+
+        # wait until namespace gets created
+        while True:
+            time.sleep(1)
+            ns = cls.k8s_client.CoreV1Api().read_namespace_status(name)
+            if ns.metadata.annotations is not None:
+                break
+
+        return name, namespace_obj
+
+    @classmethod
+    def delete_namespace(cls, name, **kwargs):
+        body = cls.k8s_client.V1DeleteOptions(**kwargs)
+        cls.k8s_client.CoreV1Api().delete_namespace(name=name, body=body)
+
+    @classmethod
+    def list_namespaces(cls, **kwargs):
+        return cls.k8s_client.CoreV1Api().list_namespace(**kwargs)
+
+    @classmethod
+    def get_kuryr_net_crds(cls, name):
+        return cls.k8s_client.CustomObjectsApi().get_cluster_custom_object(
+            group=KURYR_NET_CRD_GROUP, version=KURYR_NET_CRD_VERSION,
+            plural=KURYR_NET_CRD_PLURAL, name=name)
