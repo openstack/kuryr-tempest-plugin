@@ -143,7 +143,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         pod_fip = self.os_admin.floating_ips_client.create_floatingip(
             floating_network_id=ext_net_id,
             tenant_id=self.get_project_id(),
-            port_id=self.get_pod_port(pod_name)['id'])
+            port_id=self.get_pod_port(pod_name, namespace)['id'])
         self.pod_fips.append(pod_fip)
         return pod_fip
 
