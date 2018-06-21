@@ -73,7 +73,6 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         container = cls.k8s_client.V1Container(name=name)
         container.image = image
-        container.args = ["sleep", "3600"]
 
         spec = cls.k8s_client.V1PodSpec(containers=[container])
 
@@ -230,7 +229,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP"):
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
-                labels={"app": 'pod-label'}, image='celebdor/kuryr-demo')
+                labels={"app": 'pod-label'}, image='kuryr/demo')
             cls.addClassResourceCleanup(cls.delete_pod, pod_name)
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type)
