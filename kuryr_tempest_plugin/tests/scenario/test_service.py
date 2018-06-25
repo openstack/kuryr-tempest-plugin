@@ -39,6 +39,7 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         super(TestServiceScenario, cls).resource_setup()
         cls.create_setup_for_service_test()
 
+    @decorators.skip_because(bug="1778516")
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
         cmd_output_list = list()
@@ -54,6 +55,7 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
                 raise lib_exc.UnexpectedResponseCode()
         self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
 
+    @decorators.skip_because(bug="1778516")
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
     def test_pod_service_curl(self):
         cmd_output_list = list()
@@ -83,6 +85,7 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
         super(TestLoadBalancerServiceScenario, cls).resource_setup()
         cls.create_setup_for_service_test(spec_type="LoadBalancer")
 
+    @decorators.skip_because(bug="1778516")
     @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
     def test_lb_service_curl(self):
         cmd_output_list = list()

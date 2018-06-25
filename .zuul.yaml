@@ -16,10 +16,8 @@
     check:
       jobs:
         - kuryr-kubernetes-tempest-octavia
-        - kuryr-kubernetes-tempest-daemon-octavia
         - kuryr-kubernetes-tempest-openshift-octavia
         - kuryr-kubernetes-tempest-lbaasv2
-        - kuryr-kubernetes-tempest-daemon-lbaasv2
         - kuryr-kubernetes-tempest-openshift-lbaasv2
         - kuryr-kubernetes-tempest-dragonflow
         - kuryr-kubernetes-tempest-ovn
@@ -29,6 +27,8 @@
         - kuryr-kubernetes-tempest-lbaasv2
     experimental:
       jobs:
+        - kuryr-kubernetes-tempest-daemon-octavia
+        - kuryr-kubernetes-tempest-daemon-lbaasv2
         - kuryr-kubernetes-tempest-daemon-openshift-octavia
         - kuryr-kubernetes-tempest-daemon-openshift-lbaasv2
         - kuryr-kubernetes-tempest-multinode-octavia
