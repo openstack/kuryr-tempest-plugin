@@ -38,3 +38,8 @@ namespace_enabled = cfg.BoolOpt("namespace_enabled",
                                 default=False,
                                 help="Whether or not namespace handler and "
                                      "driver are enabled")
+
+service_tests_enabled = cfg.BoolOpt("service_tests_enabled",
+                                    default=False,
+                                    help="Whether or not service tests "
+                                         "will be running")

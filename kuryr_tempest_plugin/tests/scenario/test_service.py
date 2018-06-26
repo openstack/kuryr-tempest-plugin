@@ -33,6 +33,8 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         super(TestServiceScenario, cls).skip_checks()
         if not CONF.network_feature_enabled.floating_ips:
             raise cls.skipException("Floating ips are not available")
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
 
     @classmethod
     def resource_setup(cls):
