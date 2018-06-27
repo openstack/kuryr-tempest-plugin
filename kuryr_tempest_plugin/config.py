@@ -40,6 +40,6 @@ namespace_enabled = cfg.BoolOpt("namespace_enabled",
                                      "driver are enabled")
 
 service_tests_enabled = cfg.BoolOpt("service_tests_enabled",
-                                    default=False,
+                                    default=True,
                                     help="Whether or not service tests "
                                          "will be running")
