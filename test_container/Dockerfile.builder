@@ -1,4 +1,4 @@
-FROM alpine:3.7
+FROM alpine:3.8
 
 RUN apk add --no-cache \
 		bash \
@@ -11,32 +11,18 @@ RUN apk add --no-cache \
 		make \
 		musl-dev \
 		perl \
-		tzdata \
-		\
-# explicitly using gnupg1 instead of gnupg (which is 2.x) due to an arm32v6 bug (likely related to our arm64v8 hardware)
-# SIGILL {si_signo=SIGILL, si_code=ILL_ILLOPC, si_addr=0xf7b79394} ---
-# (in dirmngr)
-		gnupg1
+		tzdata
 
-# pub   1024D/ACC9965B 2006-12-12
-#       Key fingerprint = C9E9 416F 76E6 10DB D09D  040F 47B7 0C55 ACC9 965B
-# uid                  Denis Vlasenko <vda.linux@googlemail.com>
-# sub   1024g/2C766641 2006-12-12
-RUN gpg --keyserver ha.pool.sks-keyservers.net --recv-keys C9E9416F76E610DBD09D040F47B70C55ACC9965B
-
-ENV BUSYBOX_VERSION 1.28.0
+ENV BUSYBOX_VERSION 1.29.0
 
 RUN set -ex; \
 	tarball="busybox-${BUSYBOX_VERSION}.tar.bz2"; \
-	curl -fL -o busybox.tar.bz2 "https://busybox.net/downloads/$tarball"; \
-	curl -fL -o busybox.tar.bz2.sign "https://busybox.net/downloads/$tarball.sign"; \
-	gpg --batch --decrypt --output busybox.tar.bz2.txt busybox.tar.bz2.sign; \
-	awk '$1 == "SHA1:" && $2 ~ /^[0-9a-f]+$/ && $3 == "'"$tarball"'" { print $2, "*busybox.tar.bz2" }' busybox.tar.bz2.txt > busybox.tar.bz2.sha1; \
-	test -s busybox.tar.bz2.sha1; \
-	sha1sum -c busybox.tar.bz2.sha1; \
+	curl -fL -o "${tarball}" "https://busybox.net/downloads/$tarball"; \
+	curl -fL -o "${tarball}.sha256" "https://busybox.net/downloads/$tarball.sha256"; \
+	sha256sum -c "$tarball.sha256"; \
 	mkdir -p /usr/src/busybox; \
-	tar -xf busybox.tar.bz2 -C /usr/src/busybox --strip-components 1; \
-	rm busybox.tar.bz2*
+	tar -xjf "$tarball" -C /usr/src/busybox --strip-components 1; \
+	rm "${tarball}" "${tarball}.sha256"
 
 WORKDIR /usr/src/busybox
 
@@ -55,6 +41,7 @@ RUN set -ex; \
 		CONFIG_FEATURE_AR_LONG_FILENAMES=y \
 		CONFIG_LAST_SUPPORTED_WCHAR=0 \
 		CONFIG_STATIC=y \
+		CONFIG_BBCONFIG=y \
 	'; \
 	\
 	unsetConfs=' \
