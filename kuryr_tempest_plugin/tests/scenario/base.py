@@ -358,3 +358,26 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         ssh_client = self.get_remote_client(fip['floating_ip_address'],
                                             private_key=keypair['private_key'])
         return ssh_client, fip
+
+    def check_controller_pod_status_for_time_period(self, retry_attempts=20,
+                                                    time_between_attempts=5,
+                                                    status='Running'):
+        # Check that the controller pod status doesn't change from provided
+        # status parameter, so for example it should stay in Running state when
+        # the service with incorrect parameters was created
+
+        controller_pods = [
+            pod.metadata.name for pod in
+            self.k8s_client.CoreV1Api().list_namespaced_pod(
+                namespace=CONF.kuryr_kubernetes.kube_system_namespace).items
+            if pod.metadata.name.startswith('kuryr-controller')]
+
+        while retry_attempts != 0:
+            time.sleep(time_between_attempts)
+            for controller_pod in controller_pods:
+                self.assertEqual("Running", self.get_pod_status(
+                    controller_pod,
+                    CONF.kuryr_kubernetes.kube_system_namespace),
+                    'Kuryr controller is not in the %s state' % status
+                )
+            retry_attempts -= 1
