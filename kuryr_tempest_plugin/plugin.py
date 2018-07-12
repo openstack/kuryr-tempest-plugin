@@ -48,6 +48,8 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                           group='kuryr_kubernetes')
         conf.register_opt(project_config.run_tests_serial,
                           group='kuryr_kubernetes')
+        conf.register_opt(project_config.kubernetes_project_name,
+                          group='kuryr_kubernetes')
 
     def get_opt_lists(self):
         return [('service_available', [project_config.service_option]),

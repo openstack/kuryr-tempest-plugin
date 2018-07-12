@@ -58,3 +58,8 @@ run_tests_serial = cfg.BoolOpt("run_tests_serial",
                                default=False,
                                help="Whether or not test run serially or "
                                     "in parallel")
+
+kubernetes_project_name = cfg.StrOpt("kubernetes_project_name",
+                                     default="k8s",
+                                     help="The OpenStack project name "
+                                          "for Kubernetes")

@@ -147,7 +147,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         self.pod_fips.append(pod_fip)
         return pod_fip
 
-    def get_project_id(self, project_name='k8s'):
+    def get_project_id(self):
+        project_name = CONF.kuryr_kubernetes.kubernetes_project_name
         projects_list = self.os_admin.projects_client.list_projects()
         for project in projects_list['projects']:
             if project_name == project['name']:
