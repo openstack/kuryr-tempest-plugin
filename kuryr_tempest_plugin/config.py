@@ -43,3 +43,18 @@ service_tests_enabled = cfg.BoolOpt("service_tests_enabled",
                                     default=True,
                                     help="Whether or not service tests "
                                          "will be running")
+
+containerized = cfg.BoolOpt("containerized",
+                            default=False,
+                            help="Whether or not kuryr-controller and "
+                                 "kuryr-cni are containerized")
+
+kube_system_namespace = cfg.StrOpt("kube_system_namespace",
+                                   default="kube-system",
+                                   help="Namespace where kuryr-controllers "
+                                        "and kuryr-cnis run")
+
+run_tests_serial = cfg.BoolOpt("run_tests_serial",
+                               default=False,
+                               help="Whether or not test run serially or "
+                                    "in parallel")
