@@ -238,6 +238,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             try:
                 time.sleep(5)
                 session.get("http://{0}".format(service_ip), timeout=2)
+
                 return
             except Exception:
                 LOG.warning('No initial traffic is passing through.')
@@ -247,14 +248,17 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         raise lib_exc.ServerFault()
 
     @classmethod
-    def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP"):
+    def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP",
+                                      label=None):
+        label = label or data_utils.rand_name('kuryr-app')
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
-                labels={"app": 'pod-label'}, image='kuryr/demo')
+                labels={"app": label}, image='kuryr/demo')
             cls.addClassResourceCleanup(cls.delete_pod, pod_name)
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type)
         cls.service_ip = cls.get_service_ip(service_name, spec_type=spec_type)
+        cls.verify_lbaas_endpoints_configured(service_name)
         cls.wait_service_status(
             cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
 
@@ -297,3 +301,34 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return [pod.metadata.name for pod in
                 self.k8s_client.CoreV1Api().list_namespaced_pod(
                     namespace=namespace).items]
+
+    def _run_and_assert_fn(self, fn, repeats=10, responses_num=2):
+        cmd_outputs = set()
+        for i in range(repeats):
+            cmd_outputs.add(fn())
+        self.assertEqual(responses_num, len(cmd_outputs),
+                         'Number of exclusive responses is incorrect. '
+                         'Got %s.' % cmd_outputs)
+
+    @classmethod
+    def verify_lbaas_endpoints_configured(cls, ep_name, namespace='default'):
+        cls._verify_endpoints_annotation(
+            ep_name=ep_name, ann_string=K8S_ANNOTATION_LBAAS_STATE,
+            poll_interval=10)
+
+    @classmethod
+    def _verify_endpoints_annotation(cls, ep_name, ann_string,
+                                     poll_interval=1, namespace='default'):
+        # wait until endpoint annotation created
+        while True:
+            time.sleep(poll_interval)
+            ep = cls.k8s_client.CoreV1Api().read_namespaced_endpoints(
+                ep_name, namespace)
+            annotations = ep.metadata.annotations
+            try:
+                json.loads(annotations[ann_string])
+                return
+            except KeyError:
+                LOG.info("Waiting till %s will appears "
+                         "in ep=%s annotation ", ann_string, ep_name)
+                continue
