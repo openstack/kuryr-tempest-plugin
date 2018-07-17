@@ -15,7 +15,6 @@
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
-import testtools
 
 from kuryr_tempest_plugin.tests.scenario import base
 
@@ -25,9 +24,13 @@ CONF = config.CONF
 
 class TestPortPoolScenario(base.BaseKuryrScenarioTest):
 
-    @testtools.skipUnless(
-        CONF.kuryr_kubernetes.port_pool_enabled,
-        "Port pool feature should be enabled to run this test")
+    @classmethod
+    def skip_checks(cls):
+        super(TestPortPoolScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.port_pool_enabled:
+            raise cls.skipException(
+                "Port pool feature should be enabled to run this test.")
+
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a3aa')
     def test_port_pool(self):
         # check the original length of list of ports
