@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import time
 
 from oslo_log import log as logging
@@ -34,6 +34,8 @@ LOG = logging.getLogger(__name__)
 KURYR_NET_CRD_GROUP = 'openstack.org'
 KURYR_NET_CRD_VERSION = 'v1'
 KURYR_NET_CRD_PLURAL = 'kuryrnets'
+K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
+K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
 
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
@@ -203,7 +205,32 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             time.sleep(5)
             service = api.read_namespaced_service(service_name, namespace)
             if spec_type == "LoadBalancer":
+                # NOTE(yboaron): In some cases, OpenShift may overwrite
+                # LB's IP stored at service.status, we need to make sure that
+                # this function will return the IP that was annotated by
+                # Kuryr controller
                 if service.status.load_balancer.ingress:
+                    endpoints = api.read_namespaced_endpoints(
+                        service_name, namespace)
+                    annotations = endpoints.metadata.annotations
+                    try:
+                        ann_dict = json.loads(
+                            annotations[K8S_ANNOTATION_LBAAS_STATE])
+                        ann_lb_ip = (
+                            ann_dict["versioned_object.data"]
+                            ["service_pub_ip_info"]
+                            ["versioned_object.data"]
+                            ["ip_addr"])
+                    except KeyError:
+                        LOG.info("Waiting till LB's IP appears in annotation "
+                                 "(ingress.ip=%s)"
+                                 % service.status.load_balancer.ingress[0].ip)
+                        continue
+                    if ann_lb_ip != service.status.load_balancer.ingress[0].ip:
+                        LOG.warning('Annotated pub_ip(%s) != ingress.ip(%s).'
+                                    % ann_lb_ip,
+                                    service.status.load_balancer.ingress[0].ip)
+                        return ann_lb_ip
                     return service.status.load_balancer.ingress[0].ip
             elif spec_type == "ClusterIP":
                 return service.spec.cluster_ip
@@ -234,7 +261,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.addClassResourceCleanup(cls.delete_pod, pod_name)
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type)
-        cls.service_ip = cls.get_service_ip(service_name)
+        cls.service_ip = cls.get_service_ip(service_name, spec_type=spec_type)
         cls.wait_service_status(
             cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
 
