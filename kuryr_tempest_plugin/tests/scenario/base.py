@@ -115,24 +115,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 return pod.status.phase
 
     def get_pod_port(self, pod_name, namespace="default"):
-        # TODO(gcheresh) get pod port using container id, as kuryr this would
-        # depend on port_debug kuryr feature
-        full_port_name = str(namespace) + "/" + str(pod_name)
-        port_list = self.os_admin.ports_client.list_ports()
-        found_ports = []
-        for port in port_list['ports']:
-            if full_port_name == port['name']:
-                return port
-            if pod_name == port['name']:
-                found_ports.append(port)
-        # To maintain backwards compatibility with the old naming we also check
-        # for matchings without namespace at the port name.
-        # Note, if there is more than one port with the same name, we have no
-        # way to differentiate them unless the namespace is used at the port
-        # name, since kubernetes will avoid having pods with the same name
-        # under the same namespace
-        if len(found_ports) == 1:
-            return found_ports[0]
+        pod = self.k8s_client.CoreV1Api().read_namespaced_pod_status(
+            namespace=namespace, name=pod_name)
+        kuryr_if = json.loads(pod.metadata.annotations[
+            'openstack.org/kuryr-vif'])
+        return kuryr_if['eth0']['versioned_object.data']['id']
 
     def exec_command_in_pod(self, pod_name, command, namespace="default"):
         api = self.k8s_client.CoreV1Api()
@@ -145,7 +132,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         pod_fip = self.os_admin.floating_ips_client.create_floatingip(
             floating_network_id=ext_net_id,
             tenant_id=self.get_project_id(),
-            port_id=self.get_pod_port(pod_name, namespace)['id'])
+            port_id=self.get_pod_port(pod_name, namespace))
         self.pod_fips.append(pod_fip)
         return pod_fip
 
