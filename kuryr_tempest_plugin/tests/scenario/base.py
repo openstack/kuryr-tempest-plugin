@@ -210,13 +210,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                             ["ip_addr"])
                     except KeyError:
                         LOG.info("Waiting till LB's IP appears in annotation "
-                                 "(ingress.ip=%s)"
-                                 % service.status.load_balancer.ingress[0].ip)
+                                 "(ingress.ip=%s)",
+                                 service.status.load_balancer.ingress[0].ip)
                         continue
                     if ann_lb_ip != service.status.load_balancer.ingress[0].ip:
-                        LOG.warning('Annotated pub_ip(%s) != ingress.ip(%s).'
-                                    % ann_lb_ip,
-                                    service.status.load_balancer.ingress[0].ip)
+                        LOG.warning(
+                            'Annotated pub_ip(%s) != ingress.ip(%s).',
+                            ann_lb_ip,
+                            service.status.load_balancer.ingress[0].ip)
                         return ann_lb_ip
                     return service.status.load_balancer.ingress[0].ip
             elif spec_type == "ClusterIP":
