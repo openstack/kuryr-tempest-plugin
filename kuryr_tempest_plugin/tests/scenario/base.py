@@ -119,7 +119,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             namespace=namespace, name=pod_name)
         kuryr_if = json.loads(pod.metadata.annotations[
             'openstack.org/kuryr-vif'])
-        return kuryr_if['eth0']['versioned_object.data']['id']
+
+        # FIXME(dulek): We need this compatibility code to run stable/queens.
+        #               Remove this once it's no longer supported.
+        kuryr_if = kuryr_if.get('eth0', kuryr_if)
+
+        return kuryr_if['versioned_object.data']['id']
 
     def exec_command_in_pod(self, pod_name, command, namespace="default"):
         api = self.k8s_client.CoreV1Api()
