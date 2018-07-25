@@ -121,3 +121,10 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
         # creation of service with unsupported type
         self.create_setup_for_service_test(spec_type="NodePort", get_ip=False)
         self.check_controller_pod_status_for_time_period()
+
+    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdbfc1b2a8')
+    def test_unsupported_service_protocol(self):
+        # Testing that kuryr controller didn't crash for 20*5 seconds since
+        # creation of service with unsupported protocol
+        self.create_setup_for_service_test(protocol="UDP", get_ip=False)
+        self.check_controller_pod_status_for_time_period()
