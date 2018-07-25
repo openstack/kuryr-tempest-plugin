@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import testtools
 import time
 
 from tempest import config
@@ -27,11 +26,15 @@ CONF = config.CONF
 
 class TestKuryrRestartScenario(base.BaseKuryrScenarioTest):
 
-    @testtools.skipUnless(
-        CONF.kuryr_kubernetes.containerized and
-        CONF.kuryr_kubernetes.run_tests_serial,
-        "CNI and controller should be containerized and this test should run "
-        "on gate, configured to run sequentially")
+    @classmethod
+    def skip_checks(cls):
+        super(TestKuryrRestartScenario, cls).skip_checks()
+        if (not CONF.kuryr_kubernetes.containerized or
+                not CONF.kuryr_kubernetes.run_tests_serial):
+            raise cls.skipException(
+                "CNI and controller should be containerized and this test "
+                "should run on gate, configured to run sequentially.")
+
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfb1a1a7')
     def test_kuryr_pod_delete(self):
         # find kuryr CNI and controller pods, delete them one by one and create
