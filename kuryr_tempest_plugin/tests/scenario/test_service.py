@@ -43,33 +43,35 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
-        cmd_output_list = list()
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
         cmd = "curl {dst_ip}".format(dst_ip=self.service_ip)
-        for i in range(2):
+
+        def curl():
             try:
-                cmd_output_list.append(
-                    subprocess.check_output(shlex.split(cmd)))
+                return subprocess.check_output(shlex.split(cmd))
             except subprocess.CalledProcessError:
                 LOG.error("Checking output of curl to the service IP %s "
                           "failed" % self.service_ip)
                 raise lib_exc.UnexpectedResponseCode()
-        self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
+
+        self._run_and_assert_fn(curl)
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
     def test_pod_service_curl(self):
-        cmd_output_list = list()
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name)
         cmd = [
             "/bin/sh", "-c", "curl {dst_ip}".format(dst_ip=self.service_ip)]
-        for i in range(2):
-            cmd_output_list.append(self.exec_command_in_pod(pod_name, cmd))
+
+        def curl():
+            output = self.exec_command_in_pod(pod_name, cmd)
             # check if the curl command succeeded
-            if not cmd_output_list[i]:
+            if not output:
                 LOG.error("Curl the service IP %s failed" % self.service_ip)
                 raise lib_exc.UnexpectedResponseCode()
-        self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
+            return output
+
+        self._run_and_assert_fn(curl)
 
 
 class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
@@ -89,15 +91,15 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
     def test_lb_service_curl(self):
-        cmd_output_list = list()
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
         cmd = "curl {dst_ip}".format(dst_ip=self.service_ip)
-        for i in range(2):
+
+        def curl():
             try:
-                cmd_output_list.append(
-                    subprocess.check_output(shlex.split(cmd)))
+                return subprocess.check_output(shlex.split(cmd))
             except subprocess.CalledProcessError:
                 LOG.error("Checking output of curl to the service IP %s "
                           "failed" % self.service_ip)
                 raise lib_exc.UnexpectedResponseCode()
-        self.assertNotEqual(cmp(cmd_output_list[0], cmd_output_list[1]), '0')
+
+        self._run_and_assert_fn(curl)
