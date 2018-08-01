@@ -44,7 +44,7 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        cmd = "curl {dst_ip}".format(dst_ip=self.service_ip)
+        cmd = "curl -Ss {dst_ip}".format(dst_ip=self.service_ip)
 
         def curl():
             try:
@@ -61,7 +61,8 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name)
         cmd = [
-            "/bin/sh", "-c", "curl {dst_ip}".format(dst_ip=self.service_ip)]
+            "/bin/sh", "-c", "curl -Ss {dst_ip}".format(
+                dst_ip=self.service_ip)]
 
         def curl():
             output = self.exec_command_in_pod(pod_name, cmd)
@@ -92,7 +93,7 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
     def test_lb_service_curl(self):
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        cmd = "curl {dst_ip}".format(dst_ip=self.service_ip)
+        cmd = "curl -Ss {dst_ip}".format(dst_ip=self.service_ip)
 
         def curl():
             try:
