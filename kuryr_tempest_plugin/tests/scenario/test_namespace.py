@@ -89,7 +89,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
             raise lib_exc.UnexpectedResponseCode()
 
         # Check resources are deleted
-        self._delete_namespace_resources(namespace_name, kuryr_net_crd_name,
+        self._delete_namespace_resources(namespace_name, kuryr_net_crd,
                                          subnet_name)
 
     def test_namespace_sg_isolation(self):
@@ -154,9 +154,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.assertIn('HELLO! I AM ALIVE!!!',
                       self.exec_command_in_pod(pod_nsdefault_name, cmd))
 
-        self._delete_namespace_resources(ns1_name, net_crd_ns1_name,
+        self._delete_namespace_resources(ns1_name, net_crd_ns1,
                                          subnet_ns1_name)
-        self._delete_namespace_resources(ns2_name, net_crd_ns2_name,
+        self._delete_namespace_resources(ns2_name, net_crd_ns2,
                                          subnet_ns2_name)
 
     def _delete_namespace_resources(self, namespace, net_crd, subnet):
@@ -166,7 +166,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         while True:
             time.sleep(1)
             try:
-                self.get_kuryr_net_crds(net_crd)
+                self.get_kuryr_net_crds(net_crd['metadata']['name'])
             except kubernetes.client.rest.ApiException:
                 break
 
