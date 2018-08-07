@@ -25,56 +25,29 @@ ports_pool_batch = cfg.IntOpt("ports_pool_batch",
                               help="The size of pool batch when "
                                    "KURYR_USE_PORT_POOLS is enabled")
 
-port_pool_enabled = cfg.BoolOpt("port_pool_enabled",
-                                default=False,
-                                help="Whether or not port pool feature is "
-                                     "enabled")
-
-lb_build_timeout = cfg.IntOpt("lb_build_timeout",
-                              default=900,
-                              help="The max time (in seconds) it should take "
-                                   "to create LB")
-
-namespace_enabled = cfg.BoolOpt("namespace_enabled",
-                                default=False,
-                                help="Whether or not namespace handler and "
-                                     "driver are enabled")
-
-network_policy_enabled = cfg.BoolOpt("network_policy_enabled",
-                                     default=False,
-                                     help="Whether or not network policy "
-                                     "handler and driver are enabled")
-
-service_tests_enabled = cfg.BoolOpt("service_tests_enabled",
-                                    default=True,
-                                    help="Whether or not service tests "
-                                         "will be running")
-
-containerized = cfg.BoolOpt("containerized",
-                            default=False,
-                            help="Whether or not kuryr-controller and "
-                                 "kuryr-cni are containerized")
-
-kube_system_namespace = cfg.StrOpt("kube_system_namespace",
-                                   default="kube-system",
-                                   help="Namespace where kuryr-controllers "
-                                        "and kuryr-cnis run")
-
-run_tests_serial = cfg.BoolOpt("run_tests_serial",
-                               default=False,
-                               help="Whether or not test run serially or "
-                                    "in parallel")
-
-kubernetes_project_name = cfg.StrOpt("kubernetes_project_name",
-                                     default="k8s",
-                                     help="The OpenStack project name "
-                                          "for Kubernetes")
-
-npwg_multi_vif_enabled = cfg.BoolOpt("npwg_multi_vif_enabled",
-                                     default=False,
-                                     help="Whether or not NPWG multi-vif "
-                                          "feature is enabled")
-
-ocp_router_fip = cfg.StrOpt("ocp_router_fip",
-                            default=None,
-                            help="OCP Router floating IP")
+kuryr_k8s_opts = [
+    cfg.BoolOpt("port_pool_enabled", default=False,
+                help="Whether or not port pool feature is enabled"),
+    cfg.IntOpt("lb_build_timeout", default=900,
+               help="The max time (in seconds) it should take to create LB"),
+    cfg.BoolOpt("namespace_enabled", default=False,
+                help="Whether or not namespace handler and driver are "
+                     "enabled"),
+    cfg.BoolOpt("network_policy_enabled", default=False,
+                help="Whether or not network policy handler and driver are "
+                     "enabled"),
+    cfg.BoolOpt("service_tests_enabled", default=True,
+                help="Whether or not service tests will be running"),
+    cfg.BoolOpt("containerized", default=False,
+                help="Whether or not kuryr-controller and kuryr-cni are "
+                     "containerized"),
+    cfg.StrOpt("kube_system_namespace", default="kube-system",
+               help="Namespace where kuryr-controllers and kuryr-cnis run"),
+    cfg.BoolOpt("run_tests_serial", default=False,
+                help="Whether or not test run serially or in parallel"),
+    cfg.StrOpt("kubernetes_project_name", default="k8s",
+               help="The OpenStack project name for Kubernetes"),
+    cfg.BoolOpt("npwg_multi_vif_enabled", default=False,
+                help="Whether or not NPWG multi-vif feature is enabled"),
+    cfg.StrOpt("ocp_router_fip", default=None, help="OCP Router floating IP"),
+]
