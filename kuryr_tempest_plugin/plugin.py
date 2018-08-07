@@ -42,6 +42,8 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                           group='kuryr_kubernetes')
         conf.register_opt(project_config.namespace_enabled,
                           group='kuryr_kubernetes')
+        conf.register_opt(project_config.network_policy_enabled,
+                          group='kuryr_kubernetes')
         conf.register_opt(project_config.service_tests_enabled,
                           group='kuryr_kubernetes')
         conf.register_opt(project_config.kube_system_namespace,
@@ -55,6 +57,7 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
         return [('service_available', [project_config.service_option]),
                 ('kuryr_kubernetes', [project_config.port_pool_enabled,
                                       project_config.namespace_enabled,
+                                      project_config.network_policy_enabled,
                                       project_config.service_tests_enabled,
                                       project_config.containerized,
                                       project_config.kube_system_namespace,
