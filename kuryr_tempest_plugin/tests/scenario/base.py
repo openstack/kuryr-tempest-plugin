@@ -67,11 +67,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def create_pod(cls, name=None, labels=None, image='kuryr/demo',
-                   namespace="default"):
+                   namespace="default", annotations=None):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-pod')
         pod = cls.k8s_client.V1Pod()
-        pod.metadata = cls.k8s_client.V1ObjectMeta(name=name, labels=labels)
+        pod.metadata = cls.k8s_client.V1ObjectMeta(name=name, labels=labels,
+                                                   annotations=annotations)
 
         container = cls.k8s_client.V1Container(name=name)
         container.image = image
@@ -97,6 +98,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             name=pod_name,
             body=body,
             namespace=namespace)
+        # TODO(apuimedo) This sleep to be replaced with a polling with
+        # timeout for the pod object to be gone from k8s api.
+        time.sleep(30)
 
     @classmethod
     def get_pod_ip(cls, pod_name, namespace="default"):
