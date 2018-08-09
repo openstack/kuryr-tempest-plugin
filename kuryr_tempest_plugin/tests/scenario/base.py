@@ -122,7 +122,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         # FIXME(dulek): We need this compatibility code to run stable/queens.
         #               Remove this once it's no longer supported.
-        kuryr_if = kuryr_if.get('eth0', kuryr_if)
+        if 'eth0' in kuryr_if:
+            kuryr_if = kuryr_if['eth0']
+        elif kuryr_if.get('versioned_object.name') == 'PodState':
+            kuryr_if = kuryr_if['versioned_object.data']['default_vif']
 
         return kuryr_if['versioned_object.data']['id']
 
