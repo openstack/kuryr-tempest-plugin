@@ -19,9 +19,11 @@ import time
 
 from oslo_log import log as logging
 from tempest import config
+from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
+from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -40,6 +42,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
     def setup_clients(cls):
         super(TestNamespaceScenario, cls).setup_clients()
 
+    @decorators.idempotent_id('bddd5441-1244-429d-a125-b53ddfb132a9')
     def test_namespace(self):
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
@@ -92,6 +95,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self._delete_namespace_resources(namespace_name, kuryr_net_crd,
                                          subnet_name)
 
+    @decorators.idempotent_id('bdde5441-1b44-449d-a125-b5fdbfb1a2a9')
     def test_namespace_sg_isolation(self):
         # Check security group resources are created
         ns1_name, ns1 = self.create_namespace()
@@ -139,19 +143,19 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         # check connectivity from NS1 to default
         cmd = ["/bin/sh", "-c", "curl {dst_ip}:8080".format(
             dst_ip=pod_nsdefault_ip)]
-        self.assertIn('HELLO! I AM ALIVE!!!',
+        self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
         # check no connectivity from NS1 to NS2
         cmd = ["/bin/sh", "-c", "curl {dst_ip}:8080".format(
             dst_ip=pod_ns2_ip)]
-        self.assertNotIn('HELLO! I AM ALIVE!!!',
+        self.assertNotIn(consts.POD_OUTPUT,
                          self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
         # check connectivity from default to NS2
         cmd = ["/bin/sh", "-c", "curl {dst_ip}:8080".format(
             dst_ip=pod_ns2_ip)]
-        self.assertIn('HELLO! I AM ALIVE!!!',
+        self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(pod_nsdefault_name, cmd))
 
         self._delete_namespace_resources(ns1_name, net_crd_ns1,
@@ -159,6 +163,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self._delete_namespace_resources(ns2_name, net_crd_ns2,
                                          subnet_ns2_name)
 
+    @decorators.idempotent_id('b43f5421-1244-449d-a125-b5fddfb1a2a9')
     def test_namespace_sg_svc_isolation(self):
         # Check security group resources are created
         ns1_name, ns1 = self.create_namespace()
@@ -217,19 +222,19 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         # check connectivity from NS1 pod to NS1 service
         cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
             dst_ip=svc_ns1_ip)]
-        self.assertIn('HELLO! I AM ALIVE!!!',
+        self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
         # check no connectivity from NS1 pod to NS2 service
         cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
             dst_ip=svc_ns2_ip)]
-        self.assertNotIn('HELLO! I AM ALIVE!!!',
+        self.assertNotIn(consts.POD_OUTPUT,
                          self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
         # check connectivity from default pod to NS2 service
         cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
             dst_ip=svc_ns2_ip)]
-        self.assertIn('HELLO! I AM ALIVE!!!',
+        self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(pod_nsdefault_name, cmd))
 
         # Check resources are deleted
