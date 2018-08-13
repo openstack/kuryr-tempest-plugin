@@ -64,7 +64,12 @@ kubernetes_project_name = cfg.StrOpt("kubernetes_project_name",
                                      default="k8s",
                                      help="The OpenStack project name "
                                           "for Kubernetes")
+
 npwg_multi_vif_enabled = cfg.BoolOpt("npwg_multi_vif_enabled",
                                      default=False,
                                      help="Whether or not NPWG multi-vif "
                                           "feature is enabled")
+
+ocp_router_fip = cfg.StrOpt("ocp_router_fip",
+                            default=None,
+                            help="OCP Router floating IP")

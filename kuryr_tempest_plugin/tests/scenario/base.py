@@ -23,6 +23,7 @@ import kubernetes
 from kubernetes import client as k8s_client
 from kubernetes import config as k8s_config
 from kubernetes.stream import stream
+from openshift import dynamic
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -37,6 +38,8 @@ KURYR_NET_CRD_VERSION = 'v1'
 KURYR_NET_CRD_PLURAL = 'kuryrnets'
 K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
+K8S_ANNOTATION_LBAAS_RT_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-route-state'
+KURYR_ROUTE_DEL_VERIFY_TIMEOUT = 30
 
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
@@ -58,6 +61,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         cls.pod_fips = []
         # TODO(dmellado): Config k8s client in a cleaner way
         k8s_config.load_kube_config()
+        cls.dyn_client = dynamic.DynamicClient(
+            k8s_config.new_client_from_config())
 
     @classmethod
     def resource_cleanup(cls):
@@ -286,6 +291,24 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 raise lib_exc.NotImplemented()
 
     @classmethod
+    def wait_kuryr_annotation(cls, api_version, kind, annotation,
+                              timeout_period, name, namespace='default'):
+        dyn_resource = cls.dyn_client.resources.get(
+            api_version=api_version, kind=kind)
+        start = time.time()
+        while time.time() - start < timeout_period:
+            time.sleep(1)
+            resource = dyn_resource.get(name, namespace=namespace)
+            if resource.metadata.annotations is None:
+                continue
+            for resp_annotation in resource.metadata.annotations:
+                if annotation in resp_annotation:
+                    return
+            LOG.info("Waiting till %s will appear "
+                     "in %s/%s annotation ", annotation, kind, name)
+        raise lib_exc.ServerFault()
+
+    @classmethod
     def wait_service_status(cls, service_ip, timeout_period):
         session = requests.Session()
         start = time.time()
@@ -305,7 +328,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP",
                                       protocol="TCP", label=None,
-                                      namespace="default", get_ip=True):
+                                      namespace="default", get_ip=True,
+                                      service_name=None):
+
         label = label or data_utils.rand_name('kuryr-app')
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
@@ -315,11 +340,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         cls.pod_num = pod_num
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type,
-            protocol=protocol, namespace=namespace)
+            protocol=protocol, namespace=namespace, service_name=service_name)
         if get_ip:
             cls.service_ip = cls.get_service_ip(
                 service_name, spec_type=spec_type, namespace=namespace)
             cls.verify_lbaas_endpoints_configured(service_name)
+            cls.service_name = service_name
             cls.wait_service_status(
                 cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
 
@@ -437,6 +463,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def _verify_endpoints_annotation(cls, ep_name, ann_string,
                                      poll_interval=1, namespace='default'):
+        LOG.info("Look for %s string in ep=%s annotation ",
+                 ann_string, ep_name)
         # wait until endpoint annotation created
         while True:
             time.sleep(poll_interval)
@@ -445,6 +473,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             annotations = ep.metadata.annotations
             try:
                 json.loads(annotations[ann_string])
+                LOG.info("Found %s string in ep=%s annotation ",
+                         ann_string, ep_name)
                 return
             except KeyError:
                 LOG.info("Waiting till %s will appears "
@@ -487,3 +517,90 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     'Kuryr controller is not in the %s state' % status
                 )
             retry_attempts -= 1
+
+    @classmethod
+    def create_route(cls, name, hostname, target_svc, namespace='default'):
+        route_manifest = {
+            'apiVersion': 'v1',
+            'kind': 'Route',
+            'metadata':
+                {
+                    'name': name,
+                },
+            'spec':
+                {
+                    'host': hostname,
+                    'to':
+                        {
+                            'kind': 'Service',
+                            'name': target_svc
+                        }
+                }
+        }
+
+        v1_routes = cls.dyn_client.resources.get(api_version='v1',
+                                                 kind='Route')
+        v1_routes.create(body=route_manifest, namespace=namespace)
+
+        LOG.info("Route=%s created, wait for kuryr-annotation", name)
+        cls.wait_kuryr_annotation(
+            api_version='route.openshift.io/v1', kind='Route',
+            annotation='openstack.org/kuryr-route-state',
+            timeout_period=90, name=name)
+        LOG.info("Found %s string in Route=%s annotation ",
+                 'openstack.org/kuryr-route-state', name)
+
+    @classmethod
+    def verify_route_endpoints_configured(cls, ep_name, namespace='default'):
+        cls._verify_endpoints_annotation(
+            ep_name=ep_name, ann_string=K8S_ANNOTATION_LBAAS_RT_STATE,
+            poll_interval=3)
+
+    @classmethod
+    def delete_route(cls, name, namespace='default'):
+        v1_routes = cls.dyn_client.resources.get(api_version='v1',
+                                                 kind='Route')
+        try:
+            v1_routes.delete(name, namespace=namespace)
+        except Exception as e:
+            if e.status == 404:
+                return
+            raise
+
+        # FIXME(yboaron): Use other method (instead of constant delay)
+        # to verify that route was deleted
+        time.sleep(KURYR_ROUTE_DEL_VERIFY_TIMEOUT)
+
+    def verify_route_http(self, router_fip, hostname, amount,
+                          should_succeed=True):
+        LOG.info("Trying to curl the route, Router_FIP=%s, hostname=%s, "
+                 "should_succeed=%s", router_fip, hostname, should_succeed)
+
+        def req():
+            if should_succeed:
+                # FIXME(yboaron): From some reason for route use case,
+                # sometimes only one of service's pods is responding to CURL
+                # although all members and L7 policy were created at Octavia.
+                # so as workaround - I added a constant delay
+                time.sleep(1)
+
+            resp = requests.get('http://{}'.format(router_fip),
+                                headers={'Host': hostname})
+            return resp.status_code, resp.content
+
+        def pred(tester, responses):
+            contents = []
+            for resp in responses:
+                status_code, content = resp
+                if should_succeed:
+                    contents.append(content)
+                else:
+                    tester.assertEqual(requests.codes.SERVICE_UNAVAILABLE,
+                                       status_code)
+            if should_succeed:
+                unique_resps = set(contents)
+                tester.assertEqual(amount, len(unique_resps),
+                                   'Incorrect amount of unique backends. '
+                                   'Got {}'.format(unique_resps))
+
+        self._run_threaded_and_assert(req, pred, fn_timeout=10)
