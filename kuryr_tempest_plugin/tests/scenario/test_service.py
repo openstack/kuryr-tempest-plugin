@@ -91,7 +91,8 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
         cls.create_setup_for_service_test(spec_type="LoadBalancer")
 
     @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
-    def test_lb_service_curl(self):
+    def test_lb_service_http(self):
+
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
         cmd = "curl -Ss {dst_ip}".format(dst_ip=self.service_ip)
 
@@ -102,5 +103,14 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
                 LOG.error("Checking output of curl to the service IP %s "
                           "failed" % self.service_ip)
                 raise lib_exc.UnexpectedResponseCode()
+        self._run_and_assert_fn(curl)
 
+    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1b5a9')
+    def test_vm_service_http(self):
+        ssh_client, fip = self.create_vm_for_connectivity_test()
+        LOG.info("Trying to curl the service IP %s from VM" % self.service_ip)
+        cmd = ("curl {dst_ip}".format(dst_ip=self.service_ip))
+
+        def curl():
+            return ssh_client.exec_command(cmd)
         self._run_and_assert_fn(curl)

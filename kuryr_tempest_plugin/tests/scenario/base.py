@@ -252,20 +252,26 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP",
-                                      label=None):
+                                      label=None, namespace="default",
+                                      get_ip=True):
         label = label or data_utils.rand_name('kuryr-app')
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
-                labels={"app": label}, image='kuryr/demo')
-            cls.addClassResourceCleanup(cls.delete_pod, pod_name)
+                labels={"app": label}, namespace=namespace)
+            cls.addClassResourceCleanup(cls.delete_pod, pod_name,
+                                        namespace=namespace)
         service_name, service_obj = cls.create_service(
-            pod_label=pod.metadata.labels, spec_type=spec_type)
-        cls.service_ip = cls.get_service_ip(service_name, spec_type=spec_type)
-        cls.verify_lbaas_endpoints_configured(service_name)
-        cls.wait_service_status(
-            cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
+            pod_label=pod.metadata.labels, spec_type=spec_type,
+            namespace=namespace)
+        if get_ip:
+            cls.service_ip = cls.get_service_ip(
+                service_name, spec_type=spec_type, namespace=namespace)
+            cls.verify_lbaas_endpoints_configured(service_name)
+            cls.wait_service_status(
+                cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
 
-        cls.addClassResourceCleanup(cls.delete_service, service_name)
+        cls.addClassResourceCleanup(cls.delete_service, service_name,
+                                    namespace=namespace)
 
     @classmethod
     def create_namespace(cls, name=None):
@@ -338,3 +344,17 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 LOG.info("Waiting till %s will appears "
                          "in ep=%s annotation ", ann_string, ep_name)
                 continue
+
+    def create_vm_for_connectivity_test(self):
+        keypair = self.create_keypair()
+        sec_grp = self._create_security_group()
+        security_groups = [
+            {'name': sec_grp['name']}
+        ]
+        server = self.create_server(name=data_utils.rand_name(prefix='kuryr'),
+                                    key_name=keypair['name'],
+                                    security_groups=security_groups)
+        fip = self.create_floating_ip(server)
+        ssh_client = self.get_remote_client(fip['floating_ip_address'],
+                                            private_key=keypair['private_key'])
+        return ssh_client, fip
