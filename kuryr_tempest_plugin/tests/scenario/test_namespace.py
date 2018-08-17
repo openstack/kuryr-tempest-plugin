@@ -13,14 +13,12 @@
 # limitations under the License.
 
 import kubernetes
-import shlex
-import subprocess
+import requests
 import time
 
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
-from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
 from kuryr_tempest_plugin.tests.scenario import consts
@@ -83,13 +81,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.wait_service_status(svc_service_ip,
                                  CONF.kuryr_kubernetes.lb_build_timeout)
 
-        cmd = "curl {dst_ip}".format(dst_ip=svc_service_ip)
-        try:
-            subprocess.check_output(shlex.split(cmd))
-        except subprocess.CalledProcessError:
-            LOG.error("Checking output of curl to the service IP %s "
-                      "failed" % svc_service_ip)
-            raise lib_exc.UnexpectedResponseCode()
+        requests.get(svc_service_ip)
 
         # Check resources are deleted
         self._delete_namespace_resources(namespace_name, kuryr_net_crd,
