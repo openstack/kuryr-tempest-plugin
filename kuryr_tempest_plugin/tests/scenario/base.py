@@ -252,8 +252,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def create_setup_for_service_test(cls, pod_num=2, spec_type="ClusterIP",
-                                      label=None, namespace="default",
-                                      get_ip=True):
+                                      protocol="TCP", label=None,
+                                      namespace="default", get_ip=True):
         label = label or data_utils.rand_name('kuryr-app')
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
@@ -262,7 +262,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                         namespace=namespace)
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type,
-            namespace=namespace)
+            protocol=protocol, namespace=namespace)
         if get_ip:
             cls.service_ip = cls.get_service_ip(
                 service_name, spec_type=spec_type, namespace=namespace)
