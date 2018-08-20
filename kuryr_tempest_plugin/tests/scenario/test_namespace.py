@@ -81,7 +81,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.wait_service_status(svc_service_ip,
                                  CONF.kuryr_kubernetes.lb_build_timeout)
 
-        requests.get(svc_service_ip)
+        requests.get("http://{dst_ip}".format(dst_ip=svc_service_ip))
 
         # Check resources are deleted
         self._delete_namespace_resources(namespace_name, kuryr_net_crd,
