@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import shlex
-import subprocess
-
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
-from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
 
@@ -44,35 +39,17 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        cmd = "curl -Ss {dst_ip}".format(dst_ip=self.service_ip)
-
-        def curl():
-            try:
-                return subprocess.check_output(shlex.split(cmd))
-            except subprocess.CalledProcessError:
-                LOG.error("Checking output of curl to the service IP %s "
-                          "failed" % self.service_ip)
-                raise lib_exc.UnexpectedResponseCode()
-
-        self._run_and_assert_fn(curl)
+        self.assert_backend_amount('http://{}'.format(self.service_ip),
+                                   self.pod_num)
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
     def test_pod_service_curl(self):
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name)
-        cmd = [
-            "/bin/sh", "-c", "curl -Ss {dst_ip}".format(
-                dst_ip=self.service_ip)]
-
-        def curl():
-            output = self.exec_command_in_pod(pod_name, cmd)
-            # check if the curl command succeeded
-            if not output:
-                LOG.error("Curl the service IP %s failed" % self.service_ip)
-                raise lib_exc.UnexpectedResponseCode()
-            return output
-
-        self._run_and_assert_fn(curl)
+        self.assert_backend_amount_from_pod(
+            'http://{}'.format(self.service_ip),
+            self.pod_num,
+            pod_name)
 
 
 class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
@@ -94,17 +71,10 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
     def test_lb_service_http(self):
 
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        cmd = "curl -Ss {dst_ip}".format(dst_ip=self.service_ip)
+        self.assert_backend_amount('http://{}'.format(self.service_ip),
+                                   self.pod_num)
 
-        def curl():
-            try:
-                return subprocess.check_output(shlex.split(cmd))
-            except subprocess.CalledProcessError:
-                LOG.error("Checking output of curl to the service IP %s "
-                          "failed" % self.service_ip)
-                raise lib_exc.UnexpectedResponseCode()
-        self._run_and_assert_fn(curl)
-
+    # TODO(yboaron): Use multi threads for 'test_vm_service_http' test
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1b5a9')
     def test_vm_service_http(self):
         ssh_client, fip = self.create_vm_for_connectivity_test()

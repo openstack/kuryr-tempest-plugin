@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from multiprocessing import pool
 import time
 
 from oslo_log import log as logging
@@ -129,11 +130,21 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         return kuryr_if['versioned_object.data']['id']
 
-    def exec_command_in_pod(self, pod_name, command, namespace="default"):
+    def exec_command_in_pod(self, pod_name, command, namespace="default",
+                            stderr=False):
         api = self.k8s_client.CoreV1Api()
-        return stream(api.connect_get_namespaced_pod_exec, pod_name, namespace,
-                      command=command, stderr=False, stdin=False, stdout=True,
-                      tty=False)
+        if stderr:
+            resp = stream(api.connect_get_namespaced_pod_exec, pod_name,
+                          namespace, command=command, stderr=True,
+                          stdin=False, stdout=True, tty=False,
+                          _preload_content=False)
+            # Run until completion
+            resp.run_forever()
+            return resp.read_stdout(), resp.read_stderr()
+        else:
+            return stream(api.connect_get_namespaced_pod_exec, pod_name,
+                          namespace, command=command, stderr=False,
+                          stdin=False, stdout=True, tty=False)
 
     def assign_fip_to_pod(self, pod_name, namespace="default"):
         ext_net_id = CONF.network.public_network_id
@@ -260,6 +271,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 labels={"app": label}, namespace=namespace)
             cls.addClassResourceCleanup(cls.delete_pod, pod_name,
                                         namespace=namespace)
+        cls.pod_num = pod_num
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type,
             protocol=protocol, namespace=namespace)
@@ -321,6 +333,59 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         self.assertEqual(responses_num, len(cmd_outputs),
                          'Number of exclusive responses is incorrect. '
                          'Got %s.' % cmd_outputs)
+
+    def assert_backend_amount(self, url, amount, headers=None,
+                              repetitions=100, threads=8, request_timeout=5):
+        def req():
+            resp = requests.get(url, headers=headers)
+            self.assertEqual(requests.codes.OK, resp.status_code,
+                             'Non-successful request to {}'.format(url))
+            return resp
+
+        def pred(tester, responses):
+            unique_resps = set(resp.content for resp in responses)
+            tester.assertEqual(amount, len(unique_resps),
+                               'Incorrect amount of unique backends. '
+                               'Got {}'.format(unique_resps))
+
+        self._run_threaded_and_assert(req, pred, repetitions=repetitions,
+                                      threads=threads,
+                                      fn_timeout=request_timeout)
+
+    def assert_backend_amount_from_pod(self, url, amount, pod, repetitions=100,
+                                       threads=8, request_timeout=7):
+        def req():
+            stdout, stderr = self.exec_command_in_pod(
+                pod, ['/usr/bin/curl', '-Ss', '-w "\n%{http_code}"', url],
+                stderr=True)
+            # check if the curl command succeeded
+            if stderr:
+                LOG.error('Failed to curl the service at {}. '
+                          'Err: {}'.format(url, stderr))
+                raise lib_exc.UnexpectedResponseCode()
+            delimiter = stdout.rfind('\n')
+            content = stdout[:delimiter]
+            status_code = int(stdout[delimiter + 1:].split('"')[0])
+            self.assertEqual(requests.codes.OK, status_code,
+                             'Non-successful request to {}'.format(url))
+            return content
+
+        def pred(tester, responses):
+            unique_resps = set(resp for resp in responses)
+            tester.assertEqual(amount, len(unique_resps),
+                               'Incorrect amount of unique backends. '
+                               'Got {}'.format(unique_resps))
+
+        self._run_threaded_and_assert(req, pred, repetitions=repetitions,
+                                      threads=threads,
+                                      fn_timeout=request_timeout)
+
+    def _run_threaded_and_assert(self, fn, predicate, repetitions=100,
+                                 threads=8, fn_timeout=1):
+        tp = pool.ThreadPool(processes=threads)
+        results = [tp.apply_async(fn) for _ in range(repetitions)]
+        resps = [result.get(timeout=fn_timeout) for result in results]
+        predicate(self, resps)
 
     @classmethod
     def verify_lbaas_endpoints_configured(cls, ep_name, namespace='default'):
