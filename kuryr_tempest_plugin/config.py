@@ -50,4 +50,6 @@ kuryr_k8s_opts = [
     cfg.BoolOpt("npwg_multi_vif_enabled", default=False,
                 help="Whether or not NPWG multi-vif feature is enabled"),
     cfg.StrOpt("ocp_router_fip", default=None, help="OCP Router floating IP"),
+    cfg.BoolOpt("kuryr_daemon_enabled", default=True, help="Whether or not "
+                "CNI should run as a daemon"),
 ]
