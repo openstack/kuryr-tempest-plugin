@@ -100,6 +100,17 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             namespace=namespace)
 
     @classmethod
+    def wait_for_pod_status(cls, pod_name, namespace="default",
+                            pod_status=None, retries=30):
+        while pod_status != cls.get_pod_status(
+                pod_name,
+                namespace=CONF.kuryr_kubernetes.kube_system_namespace):
+            time.sleep(1)
+            retries -= 1
+            if retries == 0:
+                raise lib_exc.TimeoutException()
+
+    @classmethod
     def get_pod_ip(cls, pod_name, namespace="default"):
         pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
             namespace=namespace)
@@ -114,6 +125,20 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         for pod in pod_list.items:
             if pod.metadata.name == pod_name:
                 return pod.status.phase
+
+    @classmethod
+    def get_pod_readiness(cls, pod_name, namespace="default",
+                          container_name=None):
+        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
+            namespace=namespace)
+        for pod in pod_list.items:
+            if pod.metadata.name == pod_name:
+                for container in pod.status.containerStatuses:
+                    if container_name:
+                        if container.name == container_name:
+                            return container.ready
+                    else:
+                        return container.ready
 
     def get_pod_port(self, pod_name, namespace="default"):
         pod = self.k8s_client.CoreV1Api().read_namespaced_pod_status(
