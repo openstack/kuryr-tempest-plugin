@@ -13,6 +13,10 @@
 # limitations under the License.
 
 - project:
+    templates:
+      - check-requirements
+      - publish-openstack-sphinx-docs
+      - tempest-plugin-jobs
     check:
       jobs:
         - kuryr-kubernetes-tempest-octavia
@@ -24,6 +28,7 @@
         - kuryr-kubernetes-tempest-dragonflow
         - kuryr-kubernetes-tempest-daemon-containerized-ovn
     gate:
+      queue: kuryr
       jobs:
         - kuryr-kubernetes-tempest-octavia
         - kuryr-kubernetes-tempest-daemon-octavia
