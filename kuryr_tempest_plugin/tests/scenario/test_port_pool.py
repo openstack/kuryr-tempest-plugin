@@ -94,8 +94,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                 pod_readiness_retries = 30
                 while not self.get_pod_readiness(
                         kube_system_pod,
-                        namespace=CONF.kuryr_kubernetes.kube_system_namespace,
-                        container_name='controller'):
+                        namespace=CONF.kuryr_kubernetes.kube_system_namespace):
                     time.sleep(1)
                     pod_readiness_retries -= 1
                     if pod_readiness_retries == 0:

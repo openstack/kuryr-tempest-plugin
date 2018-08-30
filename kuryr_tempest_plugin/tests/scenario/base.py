@@ -127,18 +127,30 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 return pod.status.phase
 
     @classmethod
-    def get_pod_readiness(cls, pod_name, namespace="default",
-                          container_name=None):
+    def get_readiness_state(cls, pod_name, namespace="default",
+                            container_name=None):
         pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
             namespace=namespace)
         for pod in pod_list.items:
             if pod.metadata.name == pod_name:
-                for container in pod.status.containerStatuses:
-                    if container_name:
+                if container_name:
+                    for container in pod.status.container_statuses:
                         if container.name == container_name:
                             return container.ready
-                    else:
-                        return container.ready
+                else:
+                    for condition in pod.status.conditions:
+                        if condition.type == 'Ready':
+                            return condition.status
+
+    @classmethod
+    def get_pod_readiness(cls, pod_name, namespace="default"):
+        return cls.get_readiness_state(pod_name, namespace=namespace)
+
+    @classmethod
+    def get_container_readiness(cls, pod_name, namespace="default",
+                                container_name=None):
+        return cls.get_readiness_state(pod_name, namespace=namespace,
+                                       container_name=container_name)
 
     def get_pod_port(self, pod_name, namespace="default"):
         pod = self.k8s_client.CoreV1Api().read_namespaced_pod_status(
