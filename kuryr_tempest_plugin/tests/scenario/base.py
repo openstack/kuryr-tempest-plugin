@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import six.moves
+
 import json
 from multiprocessing import pool
 import time
@@ -670,3 +672,24 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         ip = self.get_pod_ip(name)
         self.assertIsNotNone(ip)
         self.assertTrue(self.ping_ip_address(ip))
+
+    def update_config_map_ini_section(
+            self, name, conf_to_update, section,
+            namespace=CONF.kuryr_kubernetes.kube_system_namespace, **kwargs):
+        # TODO(gcheresh): Check what happens if two tests try to update
+        # the config map simultaneously.
+
+        # update the config map ini part with the new values
+        conf_map = self.k8s_client.CoreV1Api().read_namespaced_config_map(
+            namespace=namespace, name=name)
+        data_to_update = conf_map.data[conf_to_update]
+        conf_parser = six.moves.configparser.ConfigParser()
+        conf_parser.readfp(six.moves.StringIO(data_to_update))
+        for key, value in kwargs.iteritems():
+            conf_parser.set(section, key, value)
+        str_obj = six.moves.StringIO()
+        conf_parser.write(str_obj)
+        updated_string = str_obj.getvalue()
+        conf_map.data[conf_to_update] = updated_string
+        self.k8s_client.CoreV1Api().replace_namespaced_config_map(
+            namespace=namespace, name=name, body=conf_map)
