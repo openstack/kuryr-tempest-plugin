@@ -50,6 +50,8 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                           group='kuryr_kubernetes')
         conf.register_opt(project_config.kubernetes_project_name,
                           group='kuryr_kubernetes')
+        conf.register_opt(project_config.npwg_multi_vif_enabled,
+                          group='kuryr_kubernetes')
 
     def get_opt_lists(self):
         return [('service_available', [project_config.service_option]),
@@ -58,6 +60,7 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                                       project_config.service_tests_enabled,
                                       project_config.containerized,
                                       project_config.kube_system_namespace,
-                                      project_config.run_tests_serial]),
+                                      project_config.run_tests_serial,
+                                      project_config.npwg_multi_vif_enabled]),
                 ('vif_pool', [project_config.ports_pool_batch,
                               project_config.lb_build_timeout])]
