@@ -111,8 +111,8 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.assertIn(net_crd_ns1_name, net_crd_ns1['metadata']['name'])
         self.assertIn(net_crd_ns2_name, net_crd_ns2['metadata']['name'])
 
-        seen_sgs = self.os_admin.security_groups_client.list_security_groups()
-        seen_sg_ids = [sg['id'] for sg in seen_sgs['security_groups']]
+        seen_sgs = self.list_security_groups()
+        seen_sg_ids = [sg['id'] for sg in seen_sgs]
 
         self.assertIn(net_crd_ns1['spec']['sgId'], seen_sg_ids)
         self.assertIn(net_crd_ns2['spec']['sgId'], seen_sg_ids)
@@ -179,8 +179,8 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.assertIn(net_crd_ns1_name, net_crd_ns1['metadata']['name'])
         self.assertIn(net_crd_ns2_name, net_crd_ns2['metadata']['name'])
 
-        seen_sgs = self.os_admin.security_groups_client.list_security_groups()
-        seen_sg_ids = [sg['id'] for sg in seen_sgs['security_groups']]
+        seen_sgs = self.list_security_groups()
+        seen_sg_ids = [sg['id'] for sg in seen_sgs]
 
         self.assertIn(net_crd_ns1['spec']['sgId'], seen_sg_ids)
         self.assertIn(net_crd_ns2['spec']['sgId'], seen_sg_ids)
@@ -254,7 +254,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_subnet_names = [n['name'] for n in seen_subnets['subnets']]
         self.assertNotIn(subnet, seen_subnet_names)
 
-        seen_sgs = self.os_admin.security_groups_client.list_security_groups()
-        seen_sg_ids = [sg['id'] for sg in seen_sgs['security_groups']]
+        seen_sgs = self.list_security_groups()
+        seen_sg_ids = [sg['id'] for sg in seen_sgs]
         if net_crd['spec'].get('sgId', None):
             self.assertNotIn(net_crd['spec']['sgId'], seen_sg_ids)
