@@ -40,6 +40,11 @@ namespace_enabled = cfg.BoolOpt("namespace_enabled",
                                 help="Whether or not namespace handler and "
                                      "driver are enabled")
 
+network_policy_enabled = cfg.BoolOpt("network_policy_enabled",
+                                     default=False,
+                                     help="Whether or not network policy "
+                                     "handler and driver are enabled")
+
 service_tests_enabled = cfg.BoolOpt("service_tests_enabled",
                                     default=True,
                                     help="Whether or not service tests "

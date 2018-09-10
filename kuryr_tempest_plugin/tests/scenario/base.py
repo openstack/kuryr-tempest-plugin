@@ -33,9 +33,10 @@ from tempest.scenario import manager
 CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
-KURYR_NET_CRD_GROUP = 'openstack.org'
-KURYR_NET_CRD_VERSION = 'v1'
+KURYR_CRD_GROUP = 'openstack.org'
+KURYR_CRD_VERSION = 'v1'
 KURYR_NET_CRD_PLURAL = 'kuryrnets'
+KURYR_NET_POLICY_CRD_PLURAL = 'kuryrnetpolicies'
 K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
 K8S_ANNOTATION_LBAAS_RT_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-route-state'
@@ -72,6 +73,27 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 fip['floatingip']['id'])
 
     @classmethod
+    def create_network_policy(cls, name=None, namespace='default'):
+        if not name:
+            name = data_utils.rand_name(prefix='kuryr-network-policy')
+        np = cls.k8s_client.V1NetworkPolicy()
+        np.kind = 'NetworkPolicy'
+        np.api_version = 'networking.k8s.io/v1'
+        np.metadata = cls.k8s_client.V1ObjectMeta(name=name,
+                                                  namespace=namespace)
+        np.spec = cls.k8s_client.V1NetworkPolicySpec(
+            egress=[cls.k8s_client.V1NetworkPolicyEgressRule(ports=None,
+                                                             to=None)],
+            ingress=[cls.k8s_client.V1NetworkPolicyIngressRule(_from=None,
+                                                               ports=None)],
+            pod_selector=cls.k8s_client.V1LabelSelector(
+                match_expressions=None,
+                match_labels=None),
+            policy_types=['Ingress', 'Egress'])
+        return cls.k8s_client.NetworkingV1Api(
+        ).create_namespaced_network_policy(namespace=namespace, body=np)
+
+    @classmethod
     def create_pod(cls, name=None, labels=None, image='kuryr/demo',
                    namespace="default", annotations=None):
         if not name:
@@ -95,6 +117,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             status = cls.get_pod_status(name, namespace)
 
         return name, pod
+
+    @classmethod
+    def delete_network_policy(cls, name, namespace='default'):
+        body = cls.k8s_client.V1DeleteOptions()
+        cls.k8s_client.NetworkingV1Api().delete_namespaced_network_policy(
+            name=name,
+            namespace=namespace,
+            body=body)
 
     @classmethod
     def delete_pod(cls, pod_name, body=None, namespace="default"):
@@ -383,10 +413,32 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return cls.k8s_client.CoreV1Api().list_namespace(**kwargs)
 
     @classmethod
+    def list_network_policies(cls, namespace='default', **kwargs):
+        network_policies_names = []
+        k8s = cls.k8s_client.NetworkingV1Api()
+        for np in k8s.list_namespaced_network_policy(namespace,
+                                                     **kwargs).items:
+            network_policies_names.append(np.metadata.name)
+        return network_policies_names
+
+    @classmethod
+    def list_security_groups(cls, **filters):
+        sgs = cls.os_admin.security_groups_client.list_security_groups(
+            **filters)['security_groups']
+        return sgs
+
+    @classmethod
     def get_kuryr_net_crds(cls, name):
         return cls.k8s_client.CustomObjectsApi().get_cluster_custom_object(
-            group=KURYR_NET_CRD_GROUP, version=KURYR_NET_CRD_VERSION,
+            group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
             plural=KURYR_NET_CRD_PLURAL, name=name)
+
+    @classmethod
+    def get_kuryr_netpolicy_crds(cls, name, namespace='default', **kwargs):
+        return cls.k8s_client.CustomObjectsApi().get_namespaced_custom_object(
+            group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
+            namespace=namespace, plural=KURYR_NET_POLICY_CRD_PLURAL,
+            name=name, **kwargs)
 
     def get_pod_name_list(self, namespace="default"):
         return [pod.metadata.name for pod in
