@@ -34,40 +34,10 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                           group='service_available')
         conf.register_opt(project_config.ports_pool_batch,
                           group='vif_pool')
-        conf.register_opt(project_config.port_pool_enabled,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.lb_build_timeout,
-                          group='kuryr_kubernetes'),
-        conf.register_opt(project_config.containerized,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.namespace_enabled,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.network_policy_enabled,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.service_tests_enabled,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.kube_system_namespace,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.run_tests_serial,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.kubernetes_project_name,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.npwg_multi_vif_enabled,
-                          group='kuryr_kubernetes')
-        conf.register_opt(project_config.ocp_router_fip,
-                          group='kuryr_kubernetes')
+        conf.register_opts(project_config.kuryr_k8s_opts,
+                           group='kuryr_kubernetes')
 
     def get_opt_lists(self):
         return [('service_available', [project_config.service_option]),
-                ('kuryr_kubernetes', [project_config.port_pool_enabled,
-                                      project_config.namespace_enabled,
-                                      project_config.network_policy_enabled,
-                                      project_config.service_tests_enabled,
-                                      project_config.containerized,
-                                      project_config.kube_system_namespace,
-                                      project_config.run_tests_serial,
-                                      project_config.npwg_multi_vif_enabled,
-                                      project_config.ocp_router_fip]),
-
-                ('vif_pool', [project_config.ports_pool_batch,
-                              project_config.lb_build_timeout])]
+                ('kuryr_kubernetes', project_config.kuryr_k8s_opts),
+                ('vif_pool', [project_config.ports_pool_batch])]
