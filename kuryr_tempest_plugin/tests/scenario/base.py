@@ -143,7 +143,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                             pod_status=None, retries=30):
         while pod_status != cls.get_pod_status(
                 pod_name,
-                namespace=CONF.kuryr_kubernetes.kube_system_namespace):
+                namespace=namespace):
             time.sleep(1)
             retries -= 1
             if retries == 0:
