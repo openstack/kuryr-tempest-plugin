@@ -67,4 +67,6 @@ kuryr_k8s_opts = [
                     "Pods"),
     cfg.BoolOpt("test_udp_services", default=False,
                 help="Whether or not service UDP tests will be running"),
+    cfg.BoolOpt("multi_worker_setup", default=False, help="Whether or not we "
+                "have a multi-worker setup"),
 ]

@@ -13,3 +13,7 @@
 # limitations under the License.
 POD_OUTPUT = 'HELLO! I AM ALIVE!!!'
 HA_ENDPOINT_NAME = 'kuryr-controller'
+POD_AFFINITY = {'requiredDuringSchedulingIgnoredDuringExecution': [
+    {'labelSelector': {'matchExpressions': [
+        {'operator': 'In', 'values': ['demo'], 'key': 'type'}]},
+        'topologyKey': 'kubernetes.io/hostname'}]}

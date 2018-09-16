@@ -101,8 +101,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def create_pod(cls, name=None, labels=None, image='kuryr/demo',
-                   namespace="default", annotations=None,
-                   wait_for_status=True):
+                   namespace="default", annotations=None, wait_for_status=True,
+                   affinity=None):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-pod')
         pod = cls.k8s_client.V1Pod()
@@ -115,6 +115,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         spec = cls.k8s_client.V1PodSpec(containers=[container])
 
         pod.spec = spec
+        pod.spec.affinity = affinity
         cls.k8s_client.CoreV1Api().create_namespaced_pod(namespace=namespace,
                                                          body=pod)
         status = ""
@@ -216,6 +217,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             kuryr_if = kuryr_if['versioned_object.data']['default_vif']
 
         return kuryr_if['versioned_object.data']['id']
+
+    @classmethod
+    def get_pod_node_name(cls, pod_name, namespace="default"):
+        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
+            namespace=namespace, field_selector='metadata.name=%s' % pod_name)
+        if not pod_list.items:
+            return None
+        else:
+            return pod_list.items[0].spec.node_name
 
     def exec_command_in_pod(self, pod_name, command, namespace="default",
                             stderr=False, container=None,
@@ -894,3 +904,21 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             name, conf_to_update, section,
             namespace, **kwargs)
         self.restart_kuryr_controller()
+
+    def create_two_pods_affinity_setup(self, labels, affinity=None):
+
+        """Setup of two pods
+
+           Create a pod with one label and a second pod
+           with an affinity parameter. For example, to
+           make sure the second pod will land on the same
+           node as the first one.
+       """
+
+        pod_name_list = []
+        pod1_name, pod1 = self.create_pod(labels=labels)
+        pod2_name, pod2 = self.create_pod(affinity=affinity)
+        self.addCleanup(self.delete_pod, pod1_name)
+        self.addCleanup(self.delete_pod, pod2_name)
+        pod_name_list.extend((pod1_name, pod2_name))
+        return pod_name_list
