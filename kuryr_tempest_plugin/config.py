@@ -24,6 +24,14 @@ ports_pool_batch = cfg.IntOpt("ports_pool_batch",
                               default=10,
                               help="The size of pool batch when "
                                    "KURYR_USE_PORT_POOLS is enabled")
+ports_pool_max = cfg.IntOpt("ports_pool_max",
+                            default=0,
+                            help="Maximum number of ports when "
+                                 "KURYR_USE_PORT_POOLS is enabled")
+ports_pool_min = cfg.IntOpt("ports_pool_min",
+                            default=5,
+                            help="Minimum number of ports when "
+                                 "KURYR_USE_PORT_POOLS is enabled")
 
 kuryr_k8s_opts = [
     cfg.BoolOpt("port_pool_enabled", default=False,

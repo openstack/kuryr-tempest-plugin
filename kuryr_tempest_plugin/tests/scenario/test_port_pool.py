@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
-from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
 
@@ -30,81 +27,120 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     @classmethod
     def skip_checks(cls):
         super(TestPortPoolScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.namespace_enabled:
+            raise cls.skipException('Namespace driver and handler must be '
+                                    'enabled to run these tests')
         if not CONF.kuryr_kubernetes.port_pool_enabled:
             raise cls.skipException(
-                "Port pool feature should be enabled to run this test.")
+                "Port pool feature should be enabled to run these tests.")
+
+    def get_subnet_id_for_ns(self, namespace_name):
+        subnet_name = 'ns/' + namespace_name + '-subnet'
+        subnets_list = self.os_admin.subnets_client.list_subnets()
+        subnet_id = [n['id'] for n in subnets_list['subnets']
+                     if n['name'] == subnet_name][0]
+        return subnet_id
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a3aa')
     def test_port_pool(self):
-        # check the original length of list of ports
-        port_list_num = len(self.os_admin.ports_client.list_ports()['ports'])
+        namespace_name, namespace = self.create_namespace()
+        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+
+        # check the original length of list of ports for new ns
+        port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
 
         # create a pod to test the port pool increase
-        pod_name, pod = self.create_pod()
-        self.addCleanup(self.delete_pod, pod_name, pod)
+        pod_name1, _ = self.create_pod(namespace=namespace_name)
 
         # port number should increase by ports_pool_batch value
-        updated_port_list_num = len(
-            self.os_admin.ports_client.list_ports()['ports'])
+        updated_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
 
-        self.assertEqual(
-            updated_port_list_num-CONF.vif_pool.ports_pool_batch,
-            port_list_num)
+        num_to_compare = updated_port_list_num - CONF.vif_pool.ports_pool_batch
+        self.assertEqual(num_to_compare, port_list_num)
 
         # create additional pod
-        pod_name, pod = self.create_pod()
-        self.addCleanup(self.delete_pod, pod_name, pod)
+        self.create_pod(namespace=namespace_name)
 
         # the port pool should stay the same
-        updated2_port_list_num = len(
-            self.os_admin.ports_client.list_ports()['ports'])
+        updated2_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
         self.assertEqual(updated_port_list_num, updated2_port_list_num)
 
         # to test the reload of the pools, we will also test the restart of the
         # kuryr-controller
-        kube_system_pods = self.get_pod_name_list(
-            namespace=CONF.kuryr_kubernetes.kube_system_namespace)
-        for kuryr_pod_name in kube_system_pods:
-            if kuryr_pod_name.startswith('kuryr-controller'):
-                self.delete_pod(
-                    pod_name=kuryr_pod_name,
-                    body={"kind": "DeleteOptions",
-                          "apiVersion": "v1",
-                          "gracePeriodSeconds": 0},
-                    namespace=CONF.kuryr_kubernetes.kube_system_namespace)
-
-                # make sure the kuryr pod was deleted
-                self.wait_for_pod_status(
-                    kuryr_pod_name,
-                    namespace=CONF.kuryr_kubernetes.kube_system_namespace)
-
-        # Check that new kuryr-controller is up and running
-        kube_system_pods = self.get_pod_name_list(
-            namespace=CONF.kuryr_kubernetes.kube_system_namespace)
-        for kube_system_pod in kube_system_pods:
-            if kube_system_pod.startswith('kuryr-controller'):
-                self.wait_for_pod_status(
-                    kube_system_pod,
-                    namespace=CONF.kuryr_kubernetes.kube_system_namespace,
-                    pod_status='Running',
-                    retries=120)
-
-                # Wait until kuryr-controller pools are reloaded, i.e.,
-                # kuryr-controller is ready
-                pod_readiness_retries = 30
-                while not self.get_pod_readiness(
-                        kube_system_pod,
-                        namespace=CONF.kuryr_kubernetes.kube_system_namespace):
-                    time.sleep(1)
-                    pod_readiness_retries -= 1
-                    if pod_readiness_retries == 0:
-                        raise lib_exc.TimeoutException()
+        self.restart_kuryr_controller()
 
         # create additional pod
-        pod_name, pod = self.create_pod()
-        self.addCleanup(self.delete_pod, pod_name, pod)
+        pod_name3, _ = self.create_pod(namespace=namespace_name)
 
-        # the port pool should stay the same
-        updated3_port_list_num = len(
-            self.os_admin.ports_client.list_ports()['ports'])
+        # the total number of ports should stay the same
+        updated3_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
         self.assertEqual(updated_port_list_num, updated3_port_list_num)
+
+        # check connectivity between pods
+        pod_ip = self.get_pod_ip(pod_name1, namespace=namespace_name)
+        cmd = [
+            "/bin/sh", "-c", "ping -c 4 {dst_ip}>/dev/null ; echo $?".format(
+                dst_ip=pod_ip)]
+        self.assertEqual(self.exec_command_in_pod(
+            pod_name3, cmd, namespace=namespace_name), '0')
+
+        self.delete_namespace(namespace_name)
+
+    @decorators.idempotent_id('bddd5441-1244-429d-a125-b55ddfb134a9')
+    def test_port_pool_update(self):
+        UPDATED_POOL_BATCH = 5
+        CONFIG_MAP_NAME = 'kuryr-config'
+        CONF_TO_UPDATE = 'kuryr.conf'
+        SECTION_TO_UPDATE = 'vif_pool'
+
+        # Check resources are created
+        namespace_name, namespace = self.create_namespace()
+        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+
+        self.update_config_map_ini_section_and_restart(
+            name=CONFIG_MAP_NAME,
+            conf_to_update=CONF_TO_UPDATE,
+            section=SECTION_TO_UPDATE,
+            ports_pool_max=0,
+            ports_pool_batch=UPDATED_POOL_BATCH,
+            ports_pool_min=1)
+        self.addCleanup(
+            self.update_config_map_ini_section_and_restart, CONFIG_MAP_NAME,
+            CONF_TO_UPDATE, SECTION_TO_UPDATE,
+            ports_pool_batch=CONF.vif_pool.ports_pool_batch,
+            ports_pool_max=CONF.vif_pool.ports_pool_max,
+            ports_pool_min=CONF.vif_pool.ports_pool_min)
+
+        # check the original length of list of ports for new ns
+        port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        # create a pod to test the port pool increase by updated value
+        pod_name1, pod1 = self.create_pod(namespace=namespace_name)
+
+        # port number should increase by updated ports_pool_batch value
+        updated_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        num_to_compare = updated_port_list_num - UPDATED_POOL_BATCH
+        self.assertEqual(num_to_compare, port_list_num)
+
+        # create additional pod
+        pod_name2, pod2 = self.create_pod(namespace=namespace_name)
+
+        # the total number of ports should stay the same
+        updated2_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        self.assertEqual(updated_port_list_num, updated2_port_list_num)
+
+        # check connectivity between pods
+        pod_ip = self.get_pod_ip(pod_name1, namespace=namespace_name)
+        cmd = [
+            "/bin/sh", "-c", "ping -c 4 {dst_ip}>/dev/null ; echo $?".format(
+                dst_ip=pod_ip)]
+        self.assertEqual(self.exec_command_in_pod(
+            pod_name2, cmd, namespace=namespace_name), '0')
+
+        self.delete_namespace(namespace_name)
