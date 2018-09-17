@@ -207,20 +207,22 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return kuryr_if['versioned_object.data']['id']
 
     def exec_command_in_pod(self, pod_name, command, namespace="default",
-                            stderr=False):
+                            stderr=False, container=None):
         api = self.k8s_client.CoreV1Api()
+        kwargs = dict(command=command, stdin=False, stdout=True, tty=False,
+                      stderr=stderr)
+        if container is not None:
+            kwargs['container'] = container
         if stderr:
+            kwargs['_preload_content'] = False
             resp = stream(api.connect_get_namespaced_pod_exec, pod_name,
-                          namespace, command=command, stderr=True,
-                          stdin=False, stdout=True, tty=False,
-                          _preload_content=False)
+                          namespace, **kwargs)
             # Run until completion
             resp.run_forever()
             return resp.read_stdout(), resp.read_stderr()
         else:
             return stream(api.connect_get_namespaced_pod_exec, pod_name,
-                          namespace, command=command, stderr=False,
-                          stdin=False, stdout=True, tty=False)
+                          namespace, **kwargs)
 
     def assign_fip_to_pod(self, pod_name, namespace="default"):
         ext_net_id = CONF.network.public_network_id
