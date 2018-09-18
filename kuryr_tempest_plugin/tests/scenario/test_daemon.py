@@ -36,9 +36,11 @@ class TestKuryrDaemon(base.BaseKuryrScenarioTest):
         namespace = CONF.kuryr_kubernetes.kube_system_namespace
         kube_system_pods = self.get_pod_name_list(
             namespace=namespace)
-        cmd = ["ps", "aux"]
+        cmd = ['cat', '/proc/1/cmdline']
 
         for kuryr_pod_name in kube_system_pods:
             if kuryr_pod_name.startswith('kuryr-cni'):
-                self.assertIn('kuryr-daemon', self.exec_command_in_pod(
-                    kuryr_pod_name, cmd, namespace))
+                self.assertIn(
+                    'kuryr-daemon --config-file',
+                    self.exec_command_in_pod(kuryr_pod_name, cmd, namespace,
+                                             container='kuryr-cni'))
