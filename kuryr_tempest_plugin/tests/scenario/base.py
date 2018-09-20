@@ -151,35 +151,38 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def get_pod_ip(cls, pod_name, namespace="default"):
-        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
-            namespace=namespace)
-        for pod in pod_list.items:
-            if pod.metadata.name == pod_name:
-                return pod.status.pod_ip
+        try:
+            pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
+                                                                 namespace)
+            return pod.status.pod_ip
+        except kubernetes.client.rest.ApiException:
+            return None
 
     @classmethod
     def get_pod_status(cls, pod_name, namespace="default"):
-        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
-            namespace=namespace)
-        for pod in pod_list.items:
-            if pod.metadata.name == pod_name:
-                return pod.status.phase
+        try:
+            pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
+                                                                 namespace)
+            return pod.status.phase
+        except kubernetes.client.rest.ApiException:
+            return None
 
     @classmethod
     def get_readiness_state(cls, pod_name, namespace="default",
                             container_name=None):
-        pod_list = cls.k8s_client.CoreV1Api().list_namespaced_pod(
-            namespace=namespace)
-        for pod in pod_list.items:
-            if pod.metadata.name == pod_name:
-                if container_name:
-                    for container in pod.status.container_statuses:
-                        if container.name == container_name:
-                            return container.ready
-                else:
-                    for condition in pod.status.conditions:
-                        if condition.type == 'Ready':
-                            return condition.status
+        try:
+            pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
+                                                                 namespace)
+            if container_name:
+                for container in pod.status.container_statuses:
+                    if container.name == container_name:
+                        return container.ready
+            else:
+                for condition in pod.status.conditions:
+                    if condition.type == 'Ready':
+                        return condition.status
+        except kubernetes.client.rest.ApiException:
+            return None
 
     @classmethod
     def get_pod_readiness(cls, pod_name, namespace="default"):
