@@ -173,16 +173,17 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         try:
             pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
                                                                  namespace)
-            if container_name:
-                for container in pod.status.container_statuses:
-                    if container.name == container_name:
-                        return container.ready
-            else:
-                for condition in pod.status.conditions:
-                    if condition.type == 'Ready':
-                        return condition.status
         except kubernetes.client.rest.ApiException:
             return None
+
+        if container_name:
+            for container in pod.status.container_statuses:
+                if container.name == container_name:
+                    return container.ready
+        else:
+            for condition in pod.status.conditions:
+                if condition.type == 'Ready':
+                    return condition.status
 
     @classmethod
     def get_pod_readiness(cls, pod_name, namespace="default"):
