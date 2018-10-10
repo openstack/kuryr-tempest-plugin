@@ -40,9 +40,8 @@
         - kuryr-kubernetes-tempest-multinode-octavia
         - kuryr-kubernetes-tempest-octavia-centos-7
         - kuryr-kubernetes-tempest-daemon-containerized-openshift-octavia
-        - kuryr-kubernetes-tempest-daemon-pools-octavia
         - kuryr-kubernetes-tempest-daemon-containerized-octavia-l2
-        - kuryr-kubernetes-tempest-daemon-containerized-octavia-namespace
+        - kuryr-kubernetes-tempest-daemon-containerized-octavia-pools-namespace
         - kuryr-kubernetes-tempest-daemon-containerized-openshift-octavia-serial
         - kuryr-kubernetes-tempest-daemon-ovn
         - kuryr-kubernetes-tempest-daemon-openshift-octavia-ingress
