@@ -156,6 +156,8 @@ RUN mkdir -p rootfs/usr/bin; \
 	cp /usr/local/bin/curl rootfs/usr/bin/curl
 
 ADD ./server.go .
+ADD ./udp_client.go .
 RUN go build -ldflags "-linkmode external -extldflags -static" -o rootfs/usr/bin/helloserver server.go
+RUN go build -ldflags "-linkmode external -extldflags -static" -o rootfs/usr/bin/udp_client  udp_client.go
 RUN mkdir -p rootfs/etc/ssl/certs \
 	&& cp /etc/ssl/certs/ca-certificates.crt rootfs/etc/ssl/certs/ca-certificates.crt
