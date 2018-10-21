@@ -39,8 +39,7 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
     def test_service_curl(self):
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        self.assert_backend_amount('http://{}'.format(self.service_ip),
-                                   self.pod_num)
+        self.assert_backend_amount(self.service_ip, self.pod_num)
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
     def test_pod_service_curl(self):
@@ -71,8 +70,7 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
     def test_lb_service_http(self):
 
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        self.assert_backend_amount('http://{}'.format(self.service_ip),
-                                   self.pod_num)
+        self.assert_backend_amount(self.service_ip, self.pod_num)
 
     # TODO(yboaron): Use multi threads for 'test_vm_service_http' test
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1b5a9')
