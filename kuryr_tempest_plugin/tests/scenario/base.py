@@ -362,7 +362,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             return True
 
         def verify_udp(dest_ip, port, udp_client_sock):
-            udp_client_sock.sendto("Hi Server, howRU?", (dest_ip, port))
+            udp_client_sock.sendto("Hi Server, howRU?".encode(),
+                                   (dest_ip, port))
             try:
                 udp_client_sock.recvfrom(512)
             except socket.timeout:
@@ -374,7 +375,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             iter_func = partial(verify_tcp, session=session)
         elif protocol == "UDP":
             udp_client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            udp_client_sock.settimeout(2.0)
+            udp_client_sock.settimeout(5.0)
             iter_func = partial(verify_udp, udp_client_sock=udp_client_sock)
         else:
             LOG.warning("Unsupported protocol %s, returning", protocol)
@@ -408,19 +409,21 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             subset = ep.subsets[0]
             subset_ports = subset.ports[0]
             for subset_address in subset.addresses:
-                num_of_be += 1
                 LOG.info('Verifying connectivity for EP backend: %s:%d; '
                          'prot=%s', subset_address.ip, subset_ports.port,
                          subset_ports.protocol)
                 if cls._verify_connectivity(subset_address.ip, timeout_period,
                                             subset_ports.protocol,
                                             subset_ports.port):
+                    num_of_be += 1
                     LOG.info('EP member %s responding...', subset_address.ip)
                 else:
                     LOG.error("Can't connect to EP member %s",
                               subset_address.ip)
                     raise lib_exc.ServerFault()
         except Exception:
+            LOG.error("wait_ep_members_status: failed to retrieve "
+                      "members details EP=%s", ep)
             return 0
         return num_of_be
 
@@ -450,10 +453,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.wait_service_status(cls.service_ip,
                                     CONF.kuryr_kubernetes.lb_build_timeout,
                                     protocol, port)
-            if pod_num != cls.wait_ep_members_status(
-                    cls.service_name, namespace,
-                    CONF.kuryr_kubernetes.lb_build_timeout):
-                LOG.error("Actual EP backend num != pod_num")
+            actual_be = cls.wait_ep_members_status(
+                cls.service_name, namespace,
+                CONF.kuryr_kubernetes.lb_build_timeout)
+            if pod_num != actual_be:
+                LOG.error("Actual EP backend num(%d) != pod_num(%d)",
+                          actual_be, pod_num)
                 raise lib_exc.ServerFault()
 
         cls.addClassResourceCleanup(cls.delete_service, service_name,
@@ -545,7 +550,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             # a new socket (new local UDP port) is allocated per request.
             udp_client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             udp_client_sock.settimeout(3.0)
-            udp_client_sock.sendto("Hi Server, howRU?",
+            udp_client_sock.sendto("Hi Server, howRU?".encode(),
                                    (server_ip, server_port))
             try:
                 data, addr = udp_client_sock.recvfrom(1024)

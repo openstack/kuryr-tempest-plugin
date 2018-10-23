@@ -56,5 +56,7 @@ kuryr_k8s_opts = [
                 help='Whether or not A/P HA of kuryr-controller is enabled'),
     cfg.StrOpt("controller_deployment_name", default="kuryr-controller",
                help="Name of Kubernetes Deployment running kuryr-controller "
-                    "Pods")
+                    "Pods"),
+    cfg.BoolOpt("test_udp_services", default=False,
+                help="Whether or not service UDP tests will be running"),
 ]
