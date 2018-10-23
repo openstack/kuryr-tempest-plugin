@@ -12,3 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 POD_OUTPUT = 'HELLO! I AM ALIVE!!!'
+HA_ENDPOINT_NAME = 'kuryr-controller'

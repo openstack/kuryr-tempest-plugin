@@ -95,7 +95,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def create_pod(cls, name=None, labels=None, image='kuryr/demo',
-                   namespace="default", annotations=None):
+                   namespace="default", annotations=None,
+                   wait_for_status=True):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-pod')
         pod = cls.k8s_client.V1Pod()
@@ -111,7 +112,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         cls.k8s_client.CoreV1Api().create_namespaced_pod(namespace=namespace,
                                                          body=pod)
         status = ""
-        while status != "Running":
+        while status != "Running" and wait_for_status:
             # TODO(dmellado) add timeout config to tempest plugin
             time.sleep(1)
             status = cls.get_pod_status(name, namespace)
@@ -662,3 +663,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                    'Got {}'.format(unique_resps))
 
         self._run_threaded_and_assert(req, pred, fn_timeout=10)
+
+    def create_and_ping_pod(self):
+        name, pod = self.create_pod()
+        self.addCleanup(self.delete_pod, name)
+        ip = self.get_pod_ip(name)
+        self.assertIsNotNone(ip)
+        self.assertTrue(self.ping_ip_address(ip))

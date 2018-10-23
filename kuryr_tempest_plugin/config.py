@@ -52,4 +52,9 @@ kuryr_k8s_opts = [
     cfg.StrOpt("ocp_router_fip", default=None, help="OCP Router floating IP"),
     cfg.BoolOpt("kuryr_daemon_enabled", default=True, help="Whether or not "
                 "CNI should run as a daemon"),
+    cfg.BoolOpt("ap_ha", default=False,
+                help='Whether or not A/P HA of kuryr-controller is enabled'),
+    cfg.StrOpt("controller_deployment_name", default="kuryr-controller",
+               help="Name of Kubernetes Deployment running kuryr-controller "
+                    "Pods")
 ]
