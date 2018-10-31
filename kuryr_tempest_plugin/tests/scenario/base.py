@@ -381,7 +381,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         if get_ip:
             cls.service_ip = cls.get_service_ip(
                 service_name, spec_type=spec_type, namespace=namespace)
-            cls.verify_lbaas_endpoints_configured(service_name)
+            cls.verify_lbaas_endpoints_configured(service_name, pod_num)
             cls.service_name = service_name
             cls.wait_service_status(
                 cls.service_ip, CONF.kuryr_kubernetes.lb_build_timeout)
@@ -514,14 +514,16 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         predicate(self, resps)
 
     @classmethod
-    def verify_lbaas_endpoints_configured(cls, ep_name, namespace='default'):
+    def verify_lbaas_endpoints_configured(cls, ep_name, pod_num,
+                                          namespace='default'):
         cls._verify_endpoints_annotation(
             ep_name=ep_name, ann_string=K8S_ANNOTATION_LBAAS_STATE,
-            poll_interval=10)
+            poll_interval=10, pod_num=pod_num)
 
     @classmethod
     def _verify_endpoints_annotation(cls, ep_name, ann_string,
-                                     poll_interval=1, namespace='default'):
+                                     poll_interval=1, namespace='default',
+                                     pod_num=None):
         LOG.info("Look for %s string in ep=%s annotation ",
                  ann_string, ep_name)
         # wait until endpoint annotation created
@@ -531,7 +533,23 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 ep_name, namespace)
             annotations = ep.metadata.annotations
             try:
-                json.loads(annotations[ann_string])
+                annotation = json.loads(annotations[ann_string])
+                # NOTE(yboaron): In some cases (depends on pod
+                # creation time) K8S-Endpoints will be created in two steps.
+                # The first step will be the creation of EP with a single pod,
+                # and the next step will be updating EP with the second pod.
+                # To handle this case properly, we need to verify not just
+                # Kuryr controller annotates LBaaS state In EP but that Kuryr
+                # controller annotates all members(pods).
+                if (ann_string == K8S_ANNOTATION_LBAAS_STATE and
+                        pod_num is not None):
+                    members_num = len(annotation.get('versioned_object.data')
+                                      .get('members'))
+                    if pod_num != members_num:
+                        LOG.info("Found %s string in ep=%s annotation but "
+                                 "members num(%d) != pod_num(%d)",
+                                 ann_string, ep_name, members_num, pod_num)
+                        continue
                 LOG.info("Found %s string in ep=%s annotation ",
                          ann_string, ep_name)
                 return
