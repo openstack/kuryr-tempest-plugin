@@ -31,6 +31,7 @@ from openshift import dynamic
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
+from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
 from tempest.scenario import manager
 
@@ -45,6 +46,7 @@ K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
 K8S_ANNOTATION_LBAAS_RT_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-route-state'
 KURYR_ROUTE_DEL_VERIFY_TIMEOUT = 30
+KURYR_CONTROLLER = 'kuryr-controller'
 
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
@@ -690,7 +692,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             pod.metadata.name for pod in
             self.k8s_client.CoreV1Api().list_namespaced_pod(
                 namespace=CONF.kuryr_kubernetes.kube_system_namespace).items
-            if pod.metadata.name.startswith('kuryr-controller')]
+            if pod.metadata.name.startswith(KURYR_CONTROLLER)]
 
         while retry_attempts != 0:
             time.sleep(time_between_attempts)
@@ -810,9 +812,57 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         conf_parser.readfp(six.moves.StringIO(data_to_update))
         for key, value in kwargs.iteritems():
             conf_parser.set(section, key, value)
+        # TODO(gcheresh): Create a function that checks all empty string values
+        # At the moment only api_root has such a value ('')
+        conf_parser.set('kubernetes', 'api_root', '""')
         str_obj = six.moves.StringIO()
         conf_parser.write(str_obj)
         updated_string = str_obj.getvalue()
         conf_map.data[conf_to_update] = updated_string
         self.k8s_client.CoreV1Api().replace_namespaced_config_map(
             namespace=namespace, name=name, body=conf_map)
+
+    def restart_kuryr_controller(self):
+        system_namespace = CONF.kuryr_kubernetes.kube_system_namespace
+        kube_system_pods = self.get_pod_name_list(
+            namespace=system_namespace)
+        for kuryr_pod_name in kube_system_pods:
+            if kuryr_pod_name.startswith(KURYR_CONTROLLER):
+                self.delete_pod(
+                    pod_name=kuryr_pod_name,
+                    body={"kind": "DeleteOptions",
+                          "apiVersion": "v1",
+                          "gracePeriodSeconds": 0},
+                    namespace=system_namespace)
+
+                # make sure the kuryr pod was deleted
+                self.wait_for_pod_status(
+                    kuryr_pod_name,
+                    namespace=system_namespace)
+
+        # Check that new kuryr-controller is up and running
+        kube_system_pods = self.get_pod_name_list(
+            namespace=system_namespace)
+        for kube_system_pod in kube_system_pods:
+            if kube_system_pod.startswith(KURYR_CONTROLLER):
+                self.wait_for_pod_status(
+                    kube_system_pod,
+                    namespace=system_namespace,
+                    pod_status='Running',
+                    retries=120)
+
+                # Wait until kuryr-controller pools are reloaded, i.e.,
+                # kuryr-controller is ready
+                res = test_utils.call_until_true(
+                    self.get_pod_readiness, 30, 1, kube_system_pod,
+                    namespace=system_namespace)
+                self.assertTrue(res, 'Timed out waiting for '
+                                     'kuryr-controller to reload pools.')
+
+    def update_config_map_ini_section_and_restart(
+            self, name, conf_to_update, section,
+            namespace=CONF.kuryr_kubernetes.kube_system_namespace, **kwargs):
+        self.update_config_map_ini_section(
+            name, conf_to_update, section,
+            namespace, **kwargs)
+        self.restart_kuryr_controller()

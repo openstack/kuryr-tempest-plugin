@@ -34,10 +34,16 @@ class KuryrTempestPlugin(plugins.TempestPlugin):
                           group='service_available')
         conf.register_opt(project_config.ports_pool_batch,
                           group='vif_pool')
+        conf.register_opt(project_config.ports_pool_min,
+                          group='vif_pool')
+        conf.register_opt(project_config.ports_pool_max,
+                          group='vif_pool')
         conf.register_opts(project_config.kuryr_k8s_opts,
                            group='kuryr_kubernetes')
 
     def get_opt_lists(self):
         return [('service_available', [project_config.service_option]),
                 ('kuryr_kubernetes', project_config.kuryr_k8s_opts),
-                ('vif_pool', [project_config.ports_pool_batch])]
+                ('vif_pool', [project_config.ports_pool_batch,
+                              project_config.ports_pool_min,
+                              project_config.ports_pool_max])]
