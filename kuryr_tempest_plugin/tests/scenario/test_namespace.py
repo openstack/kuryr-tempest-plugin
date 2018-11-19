@@ -96,27 +96,14 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         existing_namespaces = [ns.metadata.name
                                for ns in self.list_namespaces().items]
-
-        self.assertIn(ns1_name, existing_namespaces)
-        self.assertIn(ns2_name, existing_namespaces)
-        self.assertIn('default', existing_namespaces)
-
-        subnet_ns1_name = 'ns/' + ns1_name + '-subnet'
-        subnet_ns2_name = 'ns/' + ns2_name + '-subnet'
-        net_crd_ns1_name = 'ns-' + ns1_name
-        net_crd_ns2_name = 'ns-' + ns2_name
-
-        net_crd_ns1 = self.get_kuryr_net_crds(net_crd_ns1_name)
-        net_crd_ns2 = self.get_kuryr_net_crds(net_crd_ns2_name)
-
-        self.assertIn(net_crd_ns1_name, net_crd_ns1['metadata']['name'])
-        self.assertIn(net_crd_ns2_name, net_crd_ns2['metadata']['name'])
-
         seen_sgs = self.list_security_groups()
         seen_sg_ids = [sg['id'] for sg in seen_sgs]
 
-        self.assertIn(net_crd_ns1['spec']['sgId'], seen_sg_ids)
-        self.assertIn(net_crd_ns2['spec']['sgId'], seen_sg_ids)
+        subnet_ns1_name, net_crd_ns1 = self._get_and_check_ns_resources(
+            ns1_name, existing_namespaces, seen_sg_ids)
+        subnet_ns2_name, net_crd_ns2 = self._get_and_check_ns_resources(
+            ns2_name, existing_namespaces, seen_sg_ids)
+        self.assertIn('default', existing_namespaces)
 
         # Create pods in different namespaces
         pod_ns1_name, pod_ns1 = self.create_pod(labels={"app": 'pod-label'},
@@ -156,6 +143,38 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self._delete_namespace_resources(ns2_name, net_crd_ns2,
                                          subnet_ns2_name)
 
+    def _get_and_check_ns_resources(self, ns_name, existing_namespaces,
+                                    existing_sgs):
+        subnet_ns_name = 'ns/' + ns_name + '-subnet'
+        net_crd_ns_name = 'ns-' + ns_name
+        self.assertIn(ns_name, existing_namespaces)
+
+        net_crd_ns = self.get_kuryr_net_crds(net_crd_ns_name)
+        self.assertIn(net_crd_ns_name, net_crd_ns['metadata']['name'])
+        self.assertIn(net_crd_ns['spec']['sgId'], existing_sgs)
+
+        return subnet_ns_name, net_crd_ns
+
+    def _create_ns_resources(self, namespace, labels=None,
+                             spec_type='ClusterIP', checking_pod=None):
+        pod_name, pod_ns = self.create_pod(labels=labels, namespace=namespace)
+        svc_name, _ = self.create_service(pod_label=pod_ns.metadata.labels,
+                                          spec_type=spec_type,
+                                          namespace=namespace)
+        svc_ip = self.get_service_ip(service_name=svc_name,
+                                     spec_type=spec_type,
+                                     namespace=namespace)
+        # Wait for service to be ready
+        if checking_pod:
+            self.assert_backend_amount_from_pod(
+                'http://{}'.format(svc_ip), 1, checking_pod,
+                namespace_name='default')
+        else:
+            self.assert_backend_amount_from_pod(
+                'http://{}'.format(svc_ip), 1, pod_name,
+                namespace_name=namespace)
+        return pod_name, svc_ip
+
     @decorators.idempotent_id('b43f5421-1244-449d-a125-b5fddfb1a2a9')
     def test_namespace_sg_svc_isolation(self):
         # Check security group resources are created
@@ -164,54 +183,26 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         existing_namespaces = [ns.metadata.name
                                for ns in self.list_namespaces().items]
-
-        self.assertIn(ns1_name, existing_namespaces)
-        self.assertIn(ns2_name, existing_namespaces)
-        self.assertIn('default', existing_namespaces)
-
-        subnet_ns1_name = 'ns/' + ns1_name + '-subnet'
-        subnet_ns2_name = 'ns/' + ns2_name + '-subnet'
-        net_crd_ns1_name = 'ns-' + ns1_name
-        net_crd_ns2_name = 'ns-' + ns2_name
-
-        net_crd_ns1 = self.get_kuryr_net_crds(net_crd_ns1_name)
-        net_crd_ns2 = self.get_kuryr_net_crds(net_crd_ns2_name)
-
-        self.assertIn(net_crd_ns1_name, net_crd_ns1['metadata']['name'])
-        self.assertIn(net_crd_ns2_name, net_crd_ns2['metadata']['name'])
-
         seen_sgs = self.list_security_groups()
         seen_sg_ids = [sg['id'] for sg in seen_sgs]
 
-        self.assertIn(net_crd_ns1['spec']['sgId'], seen_sg_ids)
-        self.assertIn(net_crd_ns2['spec']['sgId'], seen_sg_ids)
-
-        # Create pods and services in different namespaces
-        pod_ns1_name, pod_ns1 = self.create_pod(labels={"app": 'pod-label'},
-                                                namespace=ns1_name)
-        svc_ns1_name, _ = self.create_service(
-            pod_label=pod_ns1.metadata.labels, namespace=ns1_name)
-        svc_ns1_ip = self.get_service_ip(service_name=svc_ns1_name,
-                                         namespace=ns1_name)
-
-        pod_ns2_name, pod_ns2 = self.create_pod(labels={"app": 'pod-label'},
-                                                namespace=ns2_name)
-        svc_ns2_name, _ = self.create_service(
-            pod_label=pod_ns2.metadata.labels, namespace=ns2_name)
-        svc_ns2_ip = self.get_service_ip(service_name=svc_ns2_name,
-                                         namespace=ns2_name)
-
-        # Wait for services to be ready
-        self.assert_backend_amount_from_pod(
-            'http://{}'.format(svc_ns1_ip), 1, pod_ns1_name,
-            namespace_name=ns1_name)
-        self.assert_backend_amount_from_pod(
-            'http://{}'.format(svc_ns2_ip), 1, pod_ns2_name,
-            namespace_name=ns2_name)
+        subnet_ns1_name, net_crd_ns1 = self._get_and_check_ns_resources(
+            ns1_name, existing_namespaces, seen_sg_ids)
+        subnet_ns2_name, net_crd_ns2 = self._get_and_check_ns_resources(
+            ns2_name, existing_namespaces, seen_sg_ids)
+        self.assertIn('default', existing_namespaces)
 
         pod_nsdefault_name, pod_nsdefault = self.create_pod(
             labels={"app": 'pod-label'}, namespace='default')
         self.addCleanup(self.delete_pod, pod_nsdefault_name)
+
+        # Create pods and services in different namespaces
+        pod_ns1_name, svc_ns1_ip = self._create_ns_resources(
+            ns1_name, labels={"app": 'pod-label'},
+            checking_pod=pod_nsdefault_name)
+        pod_ns2_name, svc_ns2_ip = self._create_ns_resources(
+            ns2_name, labels={"app": 'pod-label'}, spec_type='LoadBalancer',
+            checking_pod=pod_nsdefault_name)
 
         # Check namespace svc connectivity and isolation
         # check connectivity from NS1 pod to NS1 service
@@ -220,17 +211,23 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
-        # check no connectivity from NS1 pod to NS2 service
+        # check no connectivity from NS2 pod to NS1 service
         cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
-            dst_ip=svc_ns2_ip)]
+            dst_ip=svc_ns1_ip)]
         self.assertNotIn(consts.POD_OUTPUT,
-                         self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
+                         self.exec_command_in_pod(pod_ns2_name, cmd, ns2_name))
 
-        # check connectivity from default pod to NS2 service
+        # check connectivity from default pod to NS1 service
+        cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
+            dst_ip=svc_ns1_ip)]
+        self.assertIn(consts.POD_OUTPUT,
+                      self.exec_command_in_pod(pod_nsdefault_name, cmd))
+
+        # check connectivity from NS1 pod to NS2 LoadBalancer type service
         cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
             dst_ip=svc_ns2_ip)]
         self.assertIn(consts.POD_OUTPUT,
-                      self.exec_command_in_pod(pod_nsdefault_name, cmd))
+                      self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
         # Check resources are deleted
         self._delete_namespace_resources(ns1_name, net_crd_ns1,
