@@ -218,16 +218,21 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return kuryr_if['versioned_object.data']['id']
 
     def exec_command_in_pod(self, pod_name, command, namespace="default",
-                            stderr=False, container=None, req_timeout=20):
+                            stderr=False, container=None,
+                            req_timeout=10, f_timeout=2):
         api = self.k8s_client.CoreV1Api()
         kwargs = dict(command=command, stdin=False, stdout=True, tty=False,
                       stderr=stderr)
         if container is not None:
             kwargs['container'] = container
         # NOTE(yboaron): sometimes the 'connect_get_namespaced_pod_exec'
-        # call is hanging from some reason (on OS select) although the command
-        # completed. To resolve that we set the '_request_timeout' value.
-        # see https://github.com/kubernetes-client/python/issues/559
+        # and rest of functions from [1] that takes timeout as parameter are
+        # hanging from some reason (on OS select) although the command
+        # completed. To resolve that we set the '_request_timeout' for
+        # 'connect_get_namespaced_pod_exec' and f_timeout for the rest
+        # of functions.
+        # [1] https://github.com/kubernetes-client/python-base/blob/master/
+        # stream/ws_client.py
         if req_timeout is not None:
             kwargs['_request_timeout'] = req_timeout
         if stderr:
@@ -235,8 +240,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             resp = stream(api.connect_get_namespaced_pod_exec, pod_name,
                           namespace, **kwargs)
             # Run until completion
-            resp.run_forever()
-            return resp.read_stdout(), resp.read_stderr()
+            resp.run_forever(timeout=f_timeout)
+            return (resp.read_stdout(timeout=f_timeout),
+                    resp.read_stderr(timeout=f_timeout))
         else:
             return stream(api.connect_get_namespaced_pod_exec, pod_name,
                           namespace, **kwargs)
@@ -594,7 +600,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                       fn_timeout=request_timeout)
 
     def assert_backend_amount_from_pod(self, url, amount, pod, repetitions=100,
-                                       threads=8, request_timeout=7):
+                                       threads=8, request_timeout=20):
         def req():
             stdout, stderr = self.exec_command_in_pod(
                 pod, ['/usr/bin/curl', '-Ss', '-w "\n%{http_code}"', url],
