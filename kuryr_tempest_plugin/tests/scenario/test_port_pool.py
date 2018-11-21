@@ -44,6 +44,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a3aa')
     def test_port_pool(self):
         namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
         subnet_id = self.get_subnet_id_for_ns(namespace_name)
 
         # check the original length of list of ports for new ns
@@ -88,8 +89,6 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         self.assertEqual(self.exec_command_in_pod(
             pod_name3, cmd, namespace=namespace_name), '0')
 
-        self.delete_namespace(namespace_name)
-
     @decorators.idempotent_id('bddd5441-1244-429d-a125-b55ddfb134a9')
     def test_port_pool_update(self):
         UPDATED_POOL_BATCH = 5
@@ -99,6 +98,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
 
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
         subnet_id = self.get_subnet_id_for_ns(namespace_name)
 
         self.update_config_map_ini_section_and_restart(
@@ -142,5 +142,3 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                 dst_ip=pod_ip)]
         self.assertEqual(self.exec_command_in_pod(
             pod_name2, cmd, namespace=namespace_name), '0')
-
-        self.delete_namespace(namespace_name)
