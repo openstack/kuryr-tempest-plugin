@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import time
 
 from oslo_concurrency import lockutils
 from oslo_log import log as logging
@@ -45,7 +46,8 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         cls.PORTS_POOL_DEFAULT_DICT = cls.get_config_map_ini_value(
             name=cls.CONFIG_MAP_NAME, conf_for_get=cls.CONF_TO_UPDATE,
             section=cls.VIF_POOL_SECTION, keys=[
-                'ports_pool_batch', 'ports_pool_min', 'ports_pool_max'])
+                'ports_pool_batch', 'ports_pool_min', 'ports_pool_max',
+                'ports_pool_update_frequency'])
 
     def get_subnet_id_for_ns(self, namespace_name):
         subnet_name = 'ns/' + namespace_name + '-subnet'
@@ -71,9 +73,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # port number should increase by ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-        LOG.info("Updated_port_list_num = %s while ports_pool_batch_conf = %s"
-                 % (updated_port_list_num, self.PORTS_POOL_DEFAULT_DICT[
-                    'ports_pool_batch']))
+        LOG.info("New_port_list_num = {} while pool_batch_conf = {}".format(
+            updated_port_list_num, self.PORTS_POOL_DEFAULT_DICT[
+                'ports_pool_batch']))
         num_to_compare = updated_port_list_num - int(
             self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'])
         self.assertEqual(num_to_compare, port_list_num)
@@ -121,7 +123,6 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_update(self):
         UPDATED_POOL_BATCH = 3
-        SECTION_TO_UPDATE = 'vif_pool'
 
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
@@ -130,13 +131,13 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         self.update_config_map_ini_section_and_restart(
             name=self.CONFIG_MAP_NAME,
             conf_to_update=self.CONF_TO_UPDATE,
-            section=SECTION_TO_UPDATE,
+            section=self.VIF_POOL_SECTION,
             ports_pool_max=0,
             ports_pool_batch=UPDATED_POOL_BATCH,
             ports_pool_min=1)
         self.addCleanup(
             self.update_config_map_ini_section_and_restart,
-            self.CONFIG_MAP_NAME, self.CONF_TO_UPDATE, SECTION_TO_UPDATE,
+            self.CONFIG_MAP_NAME, self.CONF_TO_UPDATE, self.VIF_POOL_SECTION,
             ports_pool_batch=self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'],
             ports_pool_max=self.PORTS_POOL_DEFAULT_DICT['ports_pool_max'],
             ports_pool_min=self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
@@ -251,3 +252,87 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         num_to_compare = updated_port_list_num - int(
             self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'])
         self.assertEqual(num_to_compare, new_port_list_num)
+
+    @decorators.idempotent_id('bddd5441-1244-429d-a123-b55ddfb137a6')
+    @lockutils.synchronized('port-pool-restarts')
+    def test_port_pool_min_max_update(self):
+        POOL_BATCH = 2
+        POOL_MAX = 2
+        POOL_MIN = 1
+
+        # Check resources are created
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+
+        self.update_config_map_ini_section_and_restart(
+            name=self.CONFIG_MAP_NAME,
+            conf_to_update=self.CONF_TO_UPDATE,
+            section=self.VIF_POOL_SECTION,
+            ports_pool_max=POOL_MAX,
+            ports_pool_batch=POOL_BATCH,
+            ports_pool_min=POOL_MIN)
+        self.addCleanup(
+            self.update_config_map_ini_section_and_restart,
+            self.CONFIG_MAP_NAME, self.CONF_TO_UPDATE, self.VIF_POOL_SECTION,
+            ports_pool_batch=self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'],
+            ports_pool_max=self.PORTS_POOL_DEFAULT_DICT['ports_pool_max'],
+            ports_pool_min=self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
+
+        # check the original length of list of ports for new ns
+        initial_ports_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        # create a pod to test the port pool increase by updated batch value
+        pod_name1, pod1 = self.create_pod(namespace=namespace_name,
+                                          labels={'type': 'demo'})
+
+        # port number should increase by updated ports_pool_batch value
+        updated_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        num_to_compare = updated_port_list_num - POOL_BATCH
+        self.assertEqual(num_to_compare, initial_ports_num)
+
+        # need to wait till ports_pool_update_frequency expires so new batch
+        # creation could be executed in order to create additional pod
+        time.sleep(int(
+            self.PORTS_POOL_DEFAULT_DICT['ports_pool_update_frequency']))
+        pod_name2, pod2 = self.create_pod(
+            namespace=namespace_name,
+            affinity={'podAffinity': consts.POD_AFFINITY})
+
+        # the total number of ports should increase by 2 as there is only 1
+        # port free and POOL_MIN=1, so new port batch will be created
+        updated2_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        num_to_compare = updated2_port_list_num - 2 * POOL_BATCH
+        self.assertEqual(num_to_compare, initial_ports_num)
+
+        # create additional pod
+        pod_name3, pod3 = self.create_pod(
+            namespace=namespace_name,
+            affinity={'podAffinity': consts.POD_AFFINITY})
+
+        # the total number of ports should stay the same
+        updated3_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        self.assertEqual(updated2_port_list_num, updated3_port_list_num)
+
+        # check connectivity between pods
+        pod_ip = self.get_pod_ip(pod_name1, namespace=namespace_name)
+        cmd = [
+            "/bin/sh", "-c", "ping -c 4 {dst_ip}>/dev/null ; echo $?".format(
+                dst_ip=pod_ip)]
+        self.assertEqual(self.exec_command_in_pod(
+            pod_name2, cmd, namespace=namespace_name), '0')
+
+        # delete all pods and make sure the number of new ports added during
+        # pod creation is equal to POOL_MAX
+        for pod_name in (pod_name1, pod_name2, pod_name3):
+            self.delete_pod(pod_name, namespace=namespace_name)
+        # timeout is needed as it takes time for ports to be deleted
+        time.sleep(30)
+        updated4_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        LOG.info("Number of ports after pods deletion and timeout = {}".format(
+            updated4_port_list_num))
+        self.assertEqual(updated4_port_list_num - initial_ports_num, POOL_MAX)
