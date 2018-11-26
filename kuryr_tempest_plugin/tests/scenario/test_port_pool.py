@@ -73,6 +73,14 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # kuryr-controller
         self.restart_kuryr_controller()
 
+        port_list_num_after_restart = len(
+            self.os_admin.ports_client.list_ports(
+                fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        self.assertEqual(updated_port_list_num, port_list_num_after_restart,
+                         "Number of Neutron ports on namespace %s subnet "
+                         "changed after kuryr-controller "
+                         "restart" % namespace_name)
+
         # create additional pod
         pod_name3, _ = self.create_pod(namespace=namespace_name)
 
