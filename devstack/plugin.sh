@@ -2,7 +2,14 @@
 function build_test_container {
     pushd "${DEST}/kuryr-tempest-plugin/test_container"
 
-    docker build -t kuryr/demo . -f Dockerfile
+    # FIXME(dulek): Until https://github.com/containers/buildah/issues/1206 is
+    #               resolved instead of podman we need to use buildah directly,
+    #               hence this awful if clause.
+    if [[ ${CONTAINER_ENGINE} == 'crio' ]]; then
+        sudo buildah bud -t docker.io/kuryr/demo -f Dockerfile .
+    else
+        docker build -t kuryr/demo . -f Dockerfile
+    fi
     popd
 }
 
