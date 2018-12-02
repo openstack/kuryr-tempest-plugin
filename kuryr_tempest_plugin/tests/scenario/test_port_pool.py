@@ -25,6 +25,9 @@ CONF = config.CONF
 
 
 class TestPortPoolScenario(base.BaseKuryrScenarioTest):
+    CONFIG_MAP_NAME = 'kuryr-config'
+    CONF_TO_UPDATE = 'kuryr.conf'
+    VIF_POOL_SECTION = 'vif_pool'
 
     @classmethod
     def skip_checks(cls):
@@ -35,6 +38,14 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         if not CONF.kuryr_kubernetes.port_pool_enabled:
             raise cls.skipException(
                 "Port pool feature should be enabled to run these tests.")
+
+    @classmethod
+    def resource_setup(cls):
+        super(TestPortPoolScenario, cls).resource_setup()
+        cls.PORTS_POOL_DEFAULT_DICT = cls.get_config_map_ini_value(
+            name=cls.CONFIG_MAP_NAME, conf_for_get=cls.CONF_TO_UPDATE,
+            section=cls.VIF_POOL_SECTION, keys=[
+                'ports_pool_batch', 'ports_pool_min', 'ports_pool_max'])
 
     def get_subnet_id_for_ns(self, namespace_name):
         subnet_name = 'ns/' + namespace_name + '-subnet'
@@ -53,7 +64,6 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # check the original length of list of ports for new ns
         port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-
         # create a pod to test the port pool increase
         pod_name1, _ = self.create_pod(namespace=namespace_name,
                                        labels={'type': 'demo'})
@@ -61,8 +71,11 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # port number should increase by ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-
-        num_to_compare = updated_port_list_num - CONF.vif_pool.ports_pool_batch
+        LOG.info("Updated_port_list_num = %s while ports_pool_batch_conf = %s"
+                 % (updated_port_list_num, self.PORTS_POOL_DEFAULT_DICT[
+                    'ports_pool_batch']))
+        num_to_compare = updated_port_list_num - int(
+            self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'])
         self.assertEqual(num_to_compare, port_list_num)
 
         # create additional pod
@@ -107,29 +120,26 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('bddd5441-1244-429d-a125-b55ddfb134a9')
     @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_update(self):
-        UPDATED_POOL_BATCH = 5
-        CONFIG_MAP_NAME = 'kuryr-config'
-        CONF_TO_UPDATE = 'kuryr.conf'
+        UPDATED_POOL_BATCH = 3
         SECTION_TO_UPDATE = 'vif_pool'
 
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
         subnet_id = self.get_subnet_id_for_ns(namespace_name)
-
         self.update_config_map_ini_section_and_restart(
-            name=CONFIG_MAP_NAME,
-            conf_to_update=CONF_TO_UPDATE,
+            name=self.CONFIG_MAP_NAME,
+            conf_to_update=self.CONF_TO_UPDATE,
             section=SECTION_TO_UPDATE,
             ports_pool_max=0,
             ports_pool_batch=UPDATED_POOL_BATCH,
             ports_pool_min=1)
         self.addCleanup(
-            self.update_config_map_ini_section_and_restart, CONFIG_MAP_NAME,
-            CONF_TO_UPDATE, SECTION_TO_UPDATE,
-            ports_pool_batch=CONF.vif_pool.ports_pool_batch,
-            ports_pool_max=CONF.vif_pool.ports_pool_max,
-            ports_pool_min=CONF.vif_pool.ports_pool_min)
+            self.update_config_map_ini_section_and_restart,
+            self.CONFIG_MAP_NAME, self.CONF_TO_UPDATE, SECTION_TO_UPDATE,
+            ports_pool_batch=self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'],
+            ports_pool_max=self.PORTS_POOL_DEFAULT_DICT['ports_pool_max'],
+            ports_pool_min=self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
 
         # check the original length of list of ports for new ns
         port_list_num = len(self.os_admin.ports_client.list_ports(
@@ -161,3 +171,83 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                 dst_ip=pod_ip)]
         self.assertEqual(self.exec_command_in_pod(
             pod_name2, cmd, namespace=namespace_name), '0')
+
+    @decorators.idempotent_id('bddd5441-1244-459d-a133-b56ddfb147a6')
+    @lockutils.synchronized('port-pool-restarts')
+    def test_port_pool_noop_update(self):
+        KUBERNETES_SECTION = 'kubernetes'
+        VIF_POOL_SECTION = 'vif_pool'
+
+        # Check resources are created
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+
+        # Read the value of the drivers
+        update_pools_vif_drivers = self.get_config_map_ini_value(
+            name=self.CONFIG_MAP_NAME, conf_for_get=self.CONF_TO_UPDATE,
+            section=VIF_POOL_SECTION,
+            keys=['pools_vif_drivers'])['pools_vif_drivers']
+        vif_pool_driver = self.get_config_map_ini_value(
+            name=self.CONFIG_MAP_NAME, conf_for_get=self.CONF_TO_UPDATE,
+            section=KUBERNETES_SECTION,
+            keys=['vif_pool_driver'])['vif_pool_driver']
+
+        if update_pools_vif_drivers:
+            self.update_config_map_ini_section(
+                name=self.CONFIG_MAP_NAME,
+                conf_to_update=self.CONF_TO_UPDATE,
+                section=VIF_POOL_SECTION,
+                pools_vif_drivers='')
+            self.addCleanup(
+                self.update_config_map_ini_section,
+                self.CONFIG_MAP_NAME, self.CONF_TO_UPDATE, VIF_POOL_SECTION,
+                pools_vif_drivers=update_pools_vif_drivers)
+
+        self.update_config_map_ini_section_and_restart(
+            name=self.CONFIG_MAP_NAME,
+            conf_to_update=self.CONF_TO_UPDATE,
+            section=KUBERNETES_SECTION,
+            vif_pool_driver='noop')
+        self.addCleanup(
+            self.update_config_map_ini_section_and_restart,
+            self.CONFIG_MAP_NAME, self.CONF_TO_UPDATE, KUBERNETES_SECTION,
+            vif_pool_driver=vif_pool_driver)
+
+        # check the original length of list of ports for new ns
+        port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        # create a pod to test the port pool increase by 1
+        self.create_pod(namespace=namespace_name, labels={'type': 'demo'})
+
+        # port number should increase by 1
+        new_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+
+        self.assertEqual(port_list_num+1, new_port_list_num)
+
+        # update pools_vif_drivers and vif_pool_driver to the previous values
+        if update_pools_vif_drivers:
+            self.update_config_map_ini_section(
+                name=self.CONFIG_MAP_NAME,
+                conf_to_update=self.CONF_TO_UPDATE,
+                section=VIF_POOL_SECTION,
+                pools_vif_drivers='')
+
+        self.update_config_map_ini_section_and_restart(
+            name=self.CONFIG_MAP_NAME,
+            conf_to_update=self.CONF_TO_UPDATE,
+            section=KUBERNETES_SECTION,
+            vif_pool_driver=vif_pool_driver)
+
+        # check that everything works as before when returning back from noop
+        # configuration for vif_pool_driver
+        self.create_pod(namespace=namespace_name,
+                        affinity={'podAffinity': consts.POD_AFFINITY})
+
+        # port number should increase by default ports_pool_batch value
+        updated_port_list_num = len(self.os_admin.ports_client.list_ports(
+            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        num_to_compare = updated_port_list_num - int(
+            self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'])
+        self.assertEqual(num_to_compare, new_port_list_num)

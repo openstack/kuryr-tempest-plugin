@@ -194,8 +194,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     return condition.status
 
     @classmethod
-    def get_pod_readiness(cls, pod_name, namespace="default"):
-        return cls.get_readiness_state(pod_name, namespace=namespace)
+    def get_pod_readiness(cls, pod_name, namespace="default",
+                          container_name=None):
+        return cls.get_readiness_state(pod_name, namespace=namespace,
+                                       container_name=container_name)
 
     @classmethod
     def get_container_readiness(cls, pod_name, namespace="default",
@@ -860,6 +862,24 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         self.k8s_client.CoreV1Api().replace_namespaced_config_map(
             namespace=namespace, name=name, body=conf_map)
 
+    @classmethod
+    def get_config_map_ini_value(
+            cls, name, conf_for_get, section, keys,
+            namespace=CONF.kuryr_kubernetes.kube_system_namespace):
+        # get the config map ini values according to the provided keys
+        port_pool_dict = dict()
+        conf_map = cls.k8s_client.CoreV1Api().read_namespaced_config_map(
+            namespace=namespace, name=name)
+        conf_parser = six.moves.configparser.ConfigParser()
+        conf_parser.readfp(six.moves.StringIO(conf_map.data[conf_for_get]))
+        for key in keys:
+            try:
+                port_pool_dict[key] = conf_parser.get(section, key)
+            except six.moves.configparser.NoOptionError:
+                port_pool_dict[key] = ''
+
+        return port_pool_dict
+
     def restart_kuryr_controller(self):
         system_namespace = CONF.kuryr_kubernetes.kube_system_namespace
         kube_system_pods = self.get_pod_name_list(
@@ -893,7 +913,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 # kuryr-controller is ready
                 res = test_utils.call_until_true(
                     self.get_pod_readiness, 30, 1, kube_system_pod,
-                    namespace=system_namespace)
+                    namespace=system_namespace, container_name='controller')
                 self.assertTrue(res, 'Timed out waiting for '
                                      'kuryr-controller to reload pools.')
 
