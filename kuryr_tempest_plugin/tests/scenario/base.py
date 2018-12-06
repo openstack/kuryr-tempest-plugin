@@ -610,11 +610,16 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 LOG.error('Failed to curl the service at {}. '
                           'Err: {}'.format(url, stderr))
                 raise lib_exc.UnexpectedResponseCode()
-            delimiter = stdout.rfind('\n')
-            content = stdout[:delimiter]
-            status_code = int(stdout[delimiter + 1:].split('"')[0])
-            self.assertEqual(requests.codes.OK, status_code,
-                             'Non-successful request to {}'.format(url))
+            try:
+                delimiter = stdout.rfind('\n')
+                content = stdout[:delimiter]
+                status_code = int(stdout[delimiter + 1:].split('"')[0])
+                self.assertEqual(requests.codes.OK, status_code,
+                                 'Non-successful request to {}'.format(url))
+            except Exception as e:
+                LOG.info("Failed to parse curl response:%s from pod, "
+                         "Exception:%s.", stdout, e)
+                raise e
             return content
 
         def pred(tester, responses):
