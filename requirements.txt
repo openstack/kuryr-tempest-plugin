@@ -12,3 +12,4 @@ testrepository>=0.0.18 # Apache-2.0/BSD
 testtools>=2.2.0 # MIT
 kubernetes>=5.0.0 # Apache-2.0
 openshift>=0.7.0
+oslo.concurrency>=3.26.0 # Apache-2.0

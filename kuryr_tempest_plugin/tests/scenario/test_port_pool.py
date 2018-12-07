@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from oslo_concurrency import lockutils
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
@@ -42,6 +43,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         return subnet_id
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a3aa')
+    @lockutils.synchronized('port-pool-restarts')
     def test_port_pool(self):
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
@@ -98,6 +100,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             pod_name3, cmd, namespace=namespace_name), '0')
 
     @decorators.idempotent_id('bddd5441-1244-429d-a125-b55ddfb134a9')
+    @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_update(self):
         UPDATED_POOL_BATCH = 5
         CONFIG_MAP_NAME = 'kuryr-config'
