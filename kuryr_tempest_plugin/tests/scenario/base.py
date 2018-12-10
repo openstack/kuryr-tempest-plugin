@@ -364,51 +364,62 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         raise lib_exc.ServerFault()
 
     @classmethod
-    def _verify_connectivity(cls, dest_ip, timeout_period, protocol, port):
-        udp_client_sock = None
+    def _verify_connectivity(cls, dest_ip, timeout_period, protocol, port,
+                             expected_different_replies=1):
 
         def verify_tcp(dest_ip, port, session):
             try:
-                session.get("http://{0}:{1}".format(dest_ip, port),
-                            timeout=2)
+                resp = requests.get("http://{0}:{1}".format(dest_ip, port),
+                                    timeout=2)
+                if resp.status_code == requests.codes.OK:
+                    return resp
             except Exception:
-                return False
-            return True
+                return None
+            return None
 
-        def verify_udp(dest_ip, port, udp_client_sock):
+        def verify_udp(dest_ip, port):
+            udp_client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            udp_client_sock.settimeout(5.0)
             udp_client_sock.sendto("Hi Server, howRU?".encode(),
                                    (dest_ip, port))
             try:
-                udp_client_sock.recvfrom(512)
+                data, addr = udp_client_sock.recvfrom(1024)
             except socket.timeout:
-                return False
-            return True
+                return None
+            return data
 
         if protocol == "TCP":
             session = requests.Session()
             iter_func = partial(verify_tcp, session=session)
         elif protocol == "UDP":
-            udp_client_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            udp_client_sock.settimeout(5.0)
-            iter_func = partial(verify_udp, udp_client_sock=udp_client_sock)
+            iter_func = verify_udp
         else:
             LOG.warning("Unsupported protocol %s, returning", protocol)
             return False
 
         start = time.time()
+        unique_resps = set()
         while time.time() - start < timeout_period:
             time.sleep(5)
-            if iter_func(dest_ip, port):
+            unique_resps.add(iter_func(dest_ip, port))
+            unique_resps.discard(None)
+            if len(unique_resps) == expected_different_replies:
+                LOG.info('We received %d replies from prot=%s;%s:%d - '
+                         'connectivity was veified!',
+                         expected_different_replies, protocol, dest_ip, port)
                 return True
-            LOG.warning('No initial traffic is passing through.')
+            LOG.info('Connectivity not verified yet, we received so far %d '
+                     'replies from prot=%s;%s:%d', len(unique_resps),
+                     protocol, dest_ip, port)
         LOG.error("Can't connect to %s:%d", dest_ip, port)
         return False
 
     @classmethod
-    def wait_service_status(cls, service_ip, timeout_period,
-                            protocol="TCP", port=80):
-        if cls._verify_connectivity(service_ip, timeout_period,
-                                    protocol, port):
+    def wait_service_status(cls, service_ip, timeout_period, protocol="TCP",
+                            port=80, num_of_back_ends=1):
+        if cls._verify_connectivity(
+                service_ip, timeout_period, protocol, port,
+                expected_different_replies=num_of_back_ends):
             LOG.info('Service responding...')
         else:
             LOG.error("Can't connect service's IP %s", service_ip)
@@ -466,7 +477,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.service_name = service_name
             cls.wait_service_status(cls.service_ip,
                                     CONF.kuryr_kubernetes.lb_build_timeout,
-                                    protocol, port)
+                                    protocol, port, num_of_back_ends=pod_num)
             actual_be = cls.wait_ep_members_status(
                 cls.service_name, namespace,
                 CONF.kuryr_kubernetes.lb_build_timeout)
