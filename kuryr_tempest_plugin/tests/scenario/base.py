@@ -49,6 +49,11 @@ KURYR_ROUTE_DEL_VERIFY_TIMEOUT = 30
 KURYR_CONTROLLER = 'kuryr-controller'
 
 
+class MissingCurlOutputInWSSOutput(lib_exc.OtherRestClientException):
+    message = ('The output of the curl command was not found in the output '
+               'streamed from the pod')
+
+
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
@@ -648,18 +653,22 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def assert_backend_amount_from_pod(self, url, amount, pod, repetitions=100,
                                        threads=8, request_timeout=20):
         def req():
-            stdout, stderr = self.exec_command_in_pod(
-                pod, ['/usr/bin/curl', '-Ss', '-w "\n%{http_code}"', url],
-                stderr=True)
+            status_prefix = '\nkuryr-tempest-plugin-curl-http_code:"'
+            cmd = ['/usr/bin/curl', '-Ss', '-w',
+                   status_prefix + '%{http_code}"\n', url]
+            stdout, stderr = self.exec_command_in_pod(pod, cmd, stderr=True)
             # check if the curl command succeeded
             if stderr:
                 LOG.error('Failed to curl the service at {}. '
                           'Err: {}'.format(url, stderr))
                 raise lib_exc.UnexpectedResponseCode()
             try:
-                delimiter = stdout.rfind('\n')
+                delimiter = stdout.rfind(status_prefix)
+                if delimiter < 0:
+                    LOG.error('Curl output not found in stdout "%s"', stdout)
+                    raise MissingCurlOutputInWSSOutput()
                 content = stdout[:delimiter]
-                status_code = int(stdout[delimiter + 1:].split('"')[0])
+                status_code = int(stdout[delimiter + len(status_prefix):-2])
                 self.assertEqual(requests.codes.OK, status_code,
                                  'Non-successful request to {}'.format(url))
             except Exception as e:
