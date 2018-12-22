@@ -18,6 +18,7 @@ from tempest import config
 from tempest.lib import decorators
 
 from kuryr_tempest_plugin.tests.scenario import base
+from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -54,7 +55,8 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
 
         # create a pod to test the port pool increase
-        pod_name1, _ = self.create_pod(namespace=namespace_name)
+        pod_name1, _ = self.create_pod(namespace=namespace_name,
+                                       labels={'type': 'demo'})
 
         # port number should increase by ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
@@ -64,7 +66,8 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         self.assertEqual(num_to_compare, port_list_num)
 
         # create additional pod
-        self.create_pod(namespace=namespace_name)
+        self.create_pod(namespace=namespace_name,
+                        affinity={'podAffinity': consts.POD_AFFINITY})
 
         # the port pool should stay the same
         updated2_port_list_num = len(self.os_admin.ports_client.list_ports(
@@ -84,7 +87,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                          "restart" % namespace_name)
 
         # create additional pod
-        pod_name3, _ = self.create_pod(namespace=namespace_name)
+        pod_name3, _ = self.create_pod(
+            namespace=namespace_name,
+            affinity={'podAffinity': consts.POD_AFFINITY})
 
         # the total number of ports should stay the same
         updated3_port_list_num = len(self.os_admin.ports_client.list_ports(
@@ -130,7 +135,8 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
         # create a pod to test the port pool increase by updated value
-        pod_name1, pod1 = self.create_pod(namespace=namespace_name)
+        pod_name1, pod1 = self.create_pod(namespace=namespace_name,
+                                          labels={'type': 'demo'})
 
         # port number should increase by updated ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
@@ -139,7 +145,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         self.assertEqual(num_to_compare, port_list_num)
 
         # create additional pod
-        pod_name2, pod2 = self.create_pod(namespace=namespace_name)
+        pod_name2, pod2 = self.create_pod(
+            namespace=namespace_name,
+            affinity={'podAffinity': consts.POD_AFFINITY})
 
         # the total number of ports should stay the same
         updated2_port_list_num = len(self.os_admin.ports_client.list_ports(
