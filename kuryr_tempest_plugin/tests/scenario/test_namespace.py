@@ -235,6 +235,26 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self._delete_namespace_resources(ns2_name, net_crd_ns2,
                                          subnet_ns2_name)
 
+    @decorators.idempotent_id('bddd5441-1244-429d-a125-b53ddfb132a9')
+    def test_host_to_namespace_connectivity(self):
+        # Create namespace and pod and service in that namespace
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        # Check host to namespace pod and service connectivity
+        pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
+                                        namespace=namespace_name)
+        pod_ip = self.get_pod_ip(pod_name, namespace=namespace_name)
+        svc_name, _ = self.create_service(pod_label=pod.metadata.labels,
+                                          namespace=namespace_name)
+        service_ip = self.get_service_ip(service_name=svc_name,
+                                         namespace=namespace_name)
+        self.wait_service_status(service_ip,
+                                 CONF.kuryr_kubernetes.lb_build_timeout)
+        # Check connectivity to pod and service in the namespace
+        self.ping_ip_address(pod_ip)
+        resp = requests.get("http://{dst_ip}".format(dst_ip=service_ip))
+        self.assertEqual(resp.status_code, 200)
+
     def _delete_namespace_resources(self, namespace, net_crd, subnet):
         # Check resources are deleted
         self.delete_namespace(namespace)
