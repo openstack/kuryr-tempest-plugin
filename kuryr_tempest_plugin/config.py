@@ -69,4 +69,6 @@ kuryr_k8s_opts = [
                 help="Whether or not service UDP tests will be running"),
     cfg.BoolOpt("multi_worker_setup", default=False, help="Whether or not we "
                 "have a multi-worker setup"),
+    cfg.BoolOpt("cloud_provider", default=False, help="Whether or not a "
+                "cloud provider is set"),
 ]

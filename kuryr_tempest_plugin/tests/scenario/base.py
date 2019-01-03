@@ -322,10 +322,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             time.sleep(5)
             service = api.read_namespaced_service(service_name, namespace)
             if spec_type == "LoadBalancer":
-                # NOTE(yboaron): In some cases, OpenShift may overwrite
-                # LB's IP stored at service.status, we need to make sure that
-                # this function will return the IP that was annotated by
-                # Kuryr controller
+                # In case of a cloud provider not being configured, OpenShift
+                # allocates an external IP and overwrites the service
+                # status/ingress/IP set by Kuryr-controller.
+                # In this case, we should retrieve the external IP from
+                # Kuryr's annotation.
+
                 if service.status.load_balancer.ingress:
                     endpoints = api.read_namespaced_endpoints(
                         service_name, namespace)
@@ -348,7 +350,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                             'Annotated pub_ip(%s) != ingress.ip(%s).',
                             ann_lb_ip,
                             service.status.load_balancer.ingress[0].ip)
-                        return ann_lb_ip
+                        if not CONF.kuryr_kubernetes.cloud_provider:
+                            return ann_lb_ip
                     return service.status.load_balancer.ingress[0].ip
             elif spec_type == "ClusterIP":
                 return service.spec.cluster_ip
