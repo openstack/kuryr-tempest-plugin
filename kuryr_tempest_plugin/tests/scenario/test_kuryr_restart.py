@@ -66,9 +66,10 @@ class TestKuryrRestartScenario(base.BaseKuryrScenarioTest):
                 pod_name, pod = self.create_pod()
                 self.addCleanup(self.delete_pod, pod_name)
                 pod_fip = self.assign_fip_to_pod(pod_name)
-                if not self.ping_ip_address(
-                        pod_fip['floatingip']['floating_ip_address']):
-                    raise lib_exc.CommandFailed()
+                self.assertIsNotNone(pod_fip['floatingip'][
+                    'floating_ip_address'])
+                self.assertTrue(self.ping_ip_address(pod_fip[
+                    'floatingip']['floating_ip_address']))
 
         # Check that both kuryr-pods are up and running
         # The newly created pods are running because create_pod is written
