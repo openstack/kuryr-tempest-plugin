@@ -196,6 +196,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def get_pod_readiness(cls, pod_name, namespace="default",
                           container_name=None):
+        LOG.info("Checking if pod {} is ready".format(pod_name))
         return cls.get_readiness_state(pod_name, namespace=namespace,
                                        container_name=container_name)
 
@@ -874,7 +875,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         conf_map = cls.k8s_client.CoreV1Api().read_namespaced_config_map(
             namespace=namespace, name=name)
         conf_parser = six.moves.configparser.ConfigParser()
-        conf_parser.readfp(six.moves.StringIO(conf_map.data[conf_for_get]))
+        conf_parser.readfp(six.moves.StringIO(conf_map.data.get(conf_for_get)))
         for key in keys:
             try:
                 port_pool_dict[key] = conf_parser.get(section, key)
