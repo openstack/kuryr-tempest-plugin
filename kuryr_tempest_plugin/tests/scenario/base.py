@@ -473,7 +473,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                       protocol="TCP", port=80,
                                       target_port=8080, label=None,
                                       namespace="default", get_ip=True,
-                                      service_name=None):
+                                      service_name=None, cleanup=True):
 
         label = label or data_utils.rand_name('kuryr-app')
         for i in range(pod_num):
@@ -502,8 +502,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                           actual_be, pod_num)
                 raise lib_exc.ServerFault()
 
-        cls.addClassResourceCleanup(cls.delete_service, service_name,
-                                    namespace=namespace)
+        if cleanup:
+            cls.addClassResourceCleanup(cls.delete_service, service_name,
+                                        namespace=namespace)
 
     @classmethod
     def create_namespace(cls, name=None):
