@@ -36,11 +36,6 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         super(TestServiceScenario, cls).resource_setup()
         cls.create_setup_for_service_test()
 
-    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfc1a1a9')
-    def test_service_curl(self):
-        LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        self.assert_backend_amount(self.service_ip, self.pod_num)
-
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
     def test_pod_service_curl(self):
         pod_name, pod = self.create_pod()
@@ -103,7 +98,15 @@ class TestUdpServiceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fda1670781')
     def test_service_udp_ping(self):
-        self.create_setup_for_service_test(protocol="UDP", port=90,
+        # NOTE(ltomasbo): Using LoadBalancer type to avoid namespace isolation
+        # restrictions as this test targets svc udp testing and not the
+        # isolation
+        self.create_setup_for_service_test(spec_type="LoadBalancer",
+                                           protocol="UDP", port=90,
                                            target_port=9090)
-        self.assert_backend_amount(self.service_ip, self.pod_num,
+        # NOTE(ltomasbo): Ensure usage of svc clusterIP IP instead of the FIP
+        # as the focus of this test is not to check FIP connectivity.
+        clusterip_svc_ip = self.get_service_ip(self.service_name,
+                                               spec_type='ClusterIP')
+        self.assert_backend_amount(clusterip_svc_ip, self.pod_num,
                                    server_port=90, protocol="UDP")

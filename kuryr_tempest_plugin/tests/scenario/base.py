@@ -184,6 +184,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             return None
 
     @classmethod
+    def get_host_ip_for_pod(cls, pod_name, namespace="default"):
+        try:
+            pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
+                                                                 namespace)
+            return pod.status.host_ip
+        except kubernetes.client.rest.ApiException:
+            return None
+
+    @classmethod
     def get_pod_status(cls, pod_name, namespace="default"):
         try:
             pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
@@ -506,18 +515,29 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         if get_ip:
             cls.service_ip = cls.get_service_ip(
                 service_name, spec_type=spec_type, namespace=namespace)
-            cls.verify_lbaas_endpoints_configured(service_name, pod_num)
+            # This is already waiting for endpoint annotations to be made by
+            # Kuryr
+            cls.verify_lbaas_endpoints_configured(service_name, pod_num,
+                                                  namespace)
             cls.service_name = service_name
-            cls.wait_service_status(cls.service_ip,
-                                    CONF.kuryr_kubernetes.lb_build_timeout,
-                                    protocol, port, num_of_back_ends=pod_num)
-            actual_be = cls.wait_ep_members_status(
-                cls.service_name, namespace,
-                CONF.kuryr_kubernetes.lb_build_timeout)
-            if pod_num != actual_be:
-                LOG.error("Actual EP backend num(%d) != pod_num(%d)",
-                          actual_be, pod_num)
-                raise lib_exc.ServerFault()
+            if spec_type != 'ClusterIP':
+                # FIXME(ltomasbo): adding workaround to use the clusterIP to
+                # check service status as there are some issues with the FIPs
+                # and OVN gates
+                clusterip_ip = cls.get_service_ip(service_name,
+                                                  spec_type="ClusterIP",
+                                                  namespace=namespace)
+                cls.wait_service_status(clusterip_ip,
+                                        CONF.kuryr_kubernetes.lb_build_timeout,
+                                        protocol, port,
+                                        num_of_back_ends=pod_num)
+                actual_be = cls.wait_ep_members_status(
+                    cls.service_name, namespace,
+                    CONF.kuryr_kubernetes.lb_build_timeout)
+                if pod_num != actual_be:
+                    LOG.error("Actual EP backend num(%d) != pod_num(%d)",
+                              actual_be, pod_num)
+                    raise lib_exc.ServerFault()
 
         if cleanup:
             cls.addClassResourceCleanup(cls.delete_service, service_name,
@@ -641,17 +661,20 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         self._run_and_assert(req, pred)
 
-    def assert_backend_amount_from_pod(self, url, amount, pod):
+    def assert_backend_amount_from_pod(self, url, amount, pod,
+                                       namespace_name='default'):
         def req():
             status_prefix = '\nkuryr-tempest-plugin-curl-http_code:"'
             cmd = ['/usr/bin/curl', '-Ss', '-w',
                    status_prefix + '%{http_code}"\n', url]
-            stdout, stderr = self.exec_command_in_pod(pod, cmd, stderr=True)
+            stdout, stderr = self.exec_command_in_pod(pod, cmd,
+                                                      namespace=namespace_name,
+                                                      stderr=True)
             # check if the curl command succeeded
             if stderr:
                 LOG.error('Failed to curl the service at {}. '
                           'Err: {}'.format(url, stderr))
-                time.sleep(5)
+                time.sleep(10)
                 return
             try:
                 delimiter = stdout.rfind(status_prefix)
@@ -678,7 +701,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         self._run_and_assert(req, pred)
 
-    def _run_and_assert(self, fn, predicate, retry_repetitions=20):
+    def _run_and_assert(self, fn, predicate, retry_repetitions=100):
         resps = [fn() for _ in range(retry_repetitions)]
         predicate(self, resps)
 
@@ -687,7 +710,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                           namespace='default'):
         cls._verify_endpoints_annotation(
             ep_name=ep_name, ann_string=K8S_ANNOTATION_LBAAS_STATE,
-            poll_interval=10, pod_num=pod_num)
+            poll_interval=5, namespace=namespace, pod_num=pod_num)
 
     @classmethod
     def _verify_endpoints_annotation(cls, ep_name, ann_string,

@@ -202,10 +202,12 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
                                          namespace=ns2_name)
 
         # Wait for services to be ready
-        self.wait_service_status(svc_ns1_ip,
-                                 CONF.kuryr_kubernetes.lb_build_timeout)
-        self.wait_service_status(svc_ns2_ip,
-                                 CONF.kuryr_kubernetes.lb_build_timeout)
+        self.assert_backend_amount_from_pod(
+            'http://{}'.format(svc_ns1_ip), 1, pod_ns1_name,
+            namespace_name=ns1_name)
+        self.assert_backend_amount_from_pod(
+            'http://{}'.format(svc_ns2_ip), 1, pod_ns2_name,
+            namespace_name=ns2_name)
 
         pod_nsdefault_name, pod_nsdefault = self.create_pod(
             labels={"app": 'pod-label'}, namespace='default')
@@ -237,24 +239,25 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
                                          subnet_ns2_name)
 
     @decorators.idempotent_id('bddd5441-1244-429d-a125-b53ddfb132a9')
-    def test_host_to_namespace_connectivity(self):
-        # Create namespace and pod and service in that namespace
+    def test_host_to_namespace_pod_connectivity(self):
+        # Create namespace and pod in that namespace
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        # Check host to namespace pod and service connectivity
+        # Check host to namespace pod and pod to host connectivity
         pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
                                         namespace=namespace_name)
         pod_ip = self.get_pod_ip(pod_name, namespace=namespace_name)
-        svc_name, _ = self.create_service(pod_label=pod.metadata.labels,
-                                          namespace=namespace_name)
-        service_ip = self.get_service_ip(service_name=svc_name,
-                                         namespace=namespace_name)
-        self.wait_service_status(service_ip,
-                                 CONF.kuryr_kubernetes.lb_build_timeout)
-        # Check connectivity to pod and service in the namespace
+        host_ip_of_pod = self.get_host_ip_for_pod(
+            pod_name, namespace=namespace_name)
+
+        # Check connectivity to pod in the namespace from host pod resides on
         self.ping_ip_address(pod_ip)
-        resp = requests.get("http://{dst_ip}".format(dst_ip=service_ip))
-        self.assertEqual(resp.status_code, 200)
+        # check connectivity from Pod to host pod resides on
+        cmd = [
+            "/bin/sh", "-c", "ping -c 4 {dst_ip}>/dev/null ; echo $?".format(
+                dst_ip=host_ip_of_pod)]
+        self.assertEqual(self.exec_command_in_pod(
+            pod_name, cmd, namespace_name), '0')
 
     def _delete_namespace_resources(self, namespace, net_crd, subnet):
         # Check resources are deleted
