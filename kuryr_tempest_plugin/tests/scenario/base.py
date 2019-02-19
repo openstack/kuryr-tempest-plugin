@@ -79,7 +79,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 fip['floatingip']['id'])
 
     @classmethod
-    def create_network_policy(cls, name=None, namespace='default'):
+    def create_network_policy(cls, name=None, namespace='default',
+                              match_labels=None):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-network-policy')
         np = cls.k8s_client.V1NetworkPolicy()
@@ -94,10 +95,27 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                                                ports=None)],
             pod_selector=cls.k8s_client.V1LabelSelector(
                 match_expressions=None,
-                match_labels=None),
+                match_labels=match_labels),
             policy_types=['Ingress', 'Egress'])
         return cls.k8s_client.NetworkingV1Api(
         ).create_namespaced_network_policy(namespace=namespace, body=np)
+
+    @classmethod
+    def update_network_policy(cls, np):
+        np_name = np.metadata.name
+        np_namespace = np.metadata.namespace
+        np_updated = cls.k8s_client.NetworkingV1Api(
+            ).replace_namespaced_network_policy(
+                name=np_name, namespace=np_namespace, body=np)
+        return np_updated
+
+    @classmethod
+    def read_network_policy(cls, np):
+        np_name = np.metadata.name
+        np_namespace = np.metadata.namespace
+        return cls.k8s_client.NetworkingV1Api(
+            ).read_namespaced_network_policy(
+                name=np_name, namespace=np_namespace)
 
     @classmethod
     def create_pod(cls, name=None, labels=None, image='kuryr/demo',
