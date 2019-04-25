@@ -127,8 +127,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         pod.metadata = cls.k8s_client.V1ObjectMeta(name=name, labels=labels,
                                                    annotations=annotations)
 
-        container = cls.k8s_client.V1Container(name=name)
-        container.image = image
+        container = kubernetes.client.V1Container(
+            name=name, image=image, image_pull_policy='IfNotPresent')
 
         spec = cls.k8s_client.V1PodSpec(containers=[container])
 
