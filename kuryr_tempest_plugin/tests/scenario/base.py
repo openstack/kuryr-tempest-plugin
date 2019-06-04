@@ -15,7 +15,6 @@ import six.moves
 
 from functools import partial
 import json
-from multiprocessing import pool
 import socket
 import time
 
@@ -601,8 +600,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                          'Got %s.' % cmd_outputs)
 
     def assert_backend_amount(self, server_ip, amount, server_port=None,
-                              protocol="TCP", headers=None, repetitions=100,
-                              threads=8, request_timeout=5):
+                              protocol="TCP", headers=None):
         def req_tcp():
             resp = requests.get(url, headers=headers)
             self.assertEqual(requests.codes.OK, resp.status_code,
@@ -646,12 +644,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             LOG.info("Unsupported protocol %s, returning", protocol)
             return
 
-        self._run_threaded_and_assert(req, pred, repetitions=repetitions,
-                                      threads=threads,
-                                      fn_timeout=request_timeout)
+        self._run_and_assert(req, pred)
 
-    def assert_backend_amount_from_pod(self, url, amount, pod, repetitions=100,
-                                       threads=8, request_timeout=20):
+    def assert_backend_amount_from_pod(self, url, amount, pod):
         def req():
             status_prefix = '\nkuryr-tempest-plugin-curl-http_code:"'
             cmd = ['/usr/bin/curl', '-Ss', '-w',
@@ -683,23 +678,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                'Incorrect amount of unique backends. '
                                'Got {}'.format(unique_resps))
 
-        self._run_threaded_and_assert(req, pred, repetitions=repetitions,
-                                      threads=threads,
-                                      fn_timeout=request_timeout)
+        self._run_and_assert(req, pred)
 
-    def _run_threaded_and_assert(
-            self, fn, predicate, repetitions=100, threads=8, fn_timeout=1,
-            retry_repetitions=10):
-        tp = pool.ThreadPool(processes=threads)
-        try:
-            results = [tp.apply_async(fn) for _ in range(repetitions)]
-            resps = [result.get(timeout=fn_timeout) for result in results]
-            predicate(self, resps)
-        except Exception as e:
-            LOG.info("Multi threaded test failed with Exception:%s. "
-                     "Retry with single thread", e)
-            resps = [fn() for _ in range(retry_repetitions)]
-            predicate(self, resps)
+    def _run_and_assert(self, fn, predicate, retry_repetitions=10):
+        resps = [fn() for _ in range(retry_repetitions)]
+        predicate(self, resps)
 
     @classmethod
     def verify_lbaas_endpoints_configured(cls, ep_name, pod_num,
@@ -868,7 +851,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                    'Incorrect amount of unique backends. '
                                    'Got {}'.format(unique_resps))
 
-        self._run_threaded_and_assert(req, pred, fn_timeout=10)
+        self._run_and_assert(req, pred)
 
     def create_and_ping_pod(self):
         name, pod = self.create_pod()
