@@ -26,7 +26,6 @@ import kubernetes
 from kubernetes import client as k8s_client
 from kubernetes import config as k8s_config
 from kubernetes.stream import stream
-from openshift import dynamic
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -46,6 +45,9 @@ K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
 K8S_ANNOTATION_LBAAS_RT_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-route-state'
 KURYR_ROUTE_DEL_VERIFY_TIMEOUT = 30
 KURYR_CONTROLLER = 'kuryr-controller'
+OS_ROUTES_API = 'route.openshift.io'
+OS_ROUTES_VERSION = 'v1'
+OS_ROUTES_PLURAL = "routes"
 
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
@@ -67,8 +69,6 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         cls.pod_fips = []
         # TODO(dmellado): Config k8s client in a cleaner way
         k8s_config.load_kube_config()
-        cls.dyn_client = dynamic.DynamicClient(
-            k8s_config.new_client_from_config())
 
     @classmethod
     def resource_cleanup(cls):
@@ -388,21 +388,21 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 raise lib_exc.NotImplemented()
 
     @classmethod
-    def wait_kuryr_annotation(cls, api_version, kind, annotation,
+    def wait_kuryr_annotation(cls, group, version, plural, annotation,
                               timeout_period, name, namespace='default'):
-        dyn_resource = cls.dyn_client.resources.get(
-            api_version=api_version, kind=kind)
+        coa_client = cls.k8s_client.CustomObjectsApi()
         start = time.time()
         while time.time() - start < timeout_period:
             time.sleep(1)
-            resource = dyn_resource.get(name, namespace=namespace)
-            if resource.metadata.annotations is None:
+            resource = coa_client.get_namespaced_custom_object(
+                group, version, namespace, plural, name)
+            if resource['metadata'].get('annotations') is None:
                 continue
-            for resp_annotation in resource.metadata.annotations:
+            for resp_annotation in resource['metadata']['annotations']:
                 if annotation in resp_annotation:
                     return
             LOG.info("Waiting till %s will appear "
-                     "in %s/%s annotation ", annotation, kind, name)
+                     "in %s/%s annotation ", annotation, plural, name)
         raise lib_exc.ServerFault()
 
     @classmethod
@@ -790,7 +790,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def create_route(cls, name, hostname, target_svc, namespace='default'):
         route_manifest = {
-            'apiVersion': 'v1',
+            'apiVersion': 'route.openshift.io/v1',
             'kind': 'Route',
             'metadata':
                 {
@@ -807,15 +807,16 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 }
         }
 
-        v1_routes = cls.dyn_client.resources.get(api_version='v1',
-                                                 kind='Route')
-        v1_routes.create(body=route_manifest, namespace=namespace)
+        cls.k8s_client.CustomObjectsApi().create_namespaced_custom_object(
+            OS_ROUTES_API, OS_ROUTES_VERSION, namespace, OS_ROUTES_PLURAL,
+            route_manifest)
 
         LOG.info("Route=%s created, wait for kuryr-annotation", name)
         cls.wait_kuryr_annotation(
-            api_version='route.openshift.io/v1', kind='Route',
-            annotation='openstack.org/kuryr-route-state',
-            timeout_period=90, name=name)
+            group=OS_ROUTES_API, version=OS_ROUTES_VERSION,
+            plural=OS_ROUTES_PLURAL,
+            annotation='openstack.org/kuryr-route-state', timeout_period=90,
+            name=name)
         LOG.info("Found %s string in Route=%s annotation ",
                  'openstack.org/kuryr-route-state', name)
 
@@ -827,11 +828,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def delete_route(cls, name, namespace='default'):
-        v1_routes = cls.dyn_client.resources.get(api_version='v1',
-                                                 kind='Route')
+        body = cls.k8s_client.V1DeleteOptions()
         try:
-            v1_routes.delete(name, namespace=namespace)
-        except Exception as e:
+            cls.k8s_client.CustomObjectsApi().delete_namespaced_custom_object(
+                OS_ROUTES_API, OS_ROUTES_VERSION, namespace, OS_ROUTES_PLURAL,
+                name, body)
+        except kubernetes.client.rest.ApiException as e:
             if e.status == 404:
                 return
             raise
