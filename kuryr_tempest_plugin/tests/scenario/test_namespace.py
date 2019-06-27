@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import kubernetes
 import requests
 import time
@@ -278,3 +279,57 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_sg_ids = [sg['id'] for sg in seen_sgs]
         if net_crd['spec'].get('sgId', None):
             self.assertNotIn(net_crd['spec']['sgId'], seen_sg_ids)
+
+    @decorators.idempotent_id('90b7cb81-f80e-4ff3-9892-9e5fdcd08289')
+    def test_create_kuryrnet_crd_without_net_id(self):
+        kuryrnet = dict(self._get_kuryrnet_obj())
+        del kuryrnet['spec']['netId']
+        error_msg = 'spec.netId in body is required'
+        self._create_kuryr_net_crd_obj(kuryrnet, error_msg)
+
+    @decorators.idempotent_id('94641749-9fdf-4fb2-a46d-064f75eac113')
+    def test_create_kuryrnet_crd_with_populated_as_string(self):
+        kuryrnet = dict(self._get_kuryrnet_obj())
+        kuryrnet['spec']['populated'] = 'False'
+        error_msg = 'spec.populated in body must be of type boolean'
+        self._create_kuryr_net_crd_obj(kuryrnet, error_msg)
+
+    def _get_kuryrnet_obj(self):
+        return {
+            "apiVersion": "openstack.org/v1",
+            "kind": "KuryrNet",
+            "metadata": {
+                "annotations": {
+                    "namespaceName": "kube-system"
+                },
+                "name": "ns-test",
+            },
+            "spec": {
+                "netId": "",
+                "routerId": "",
+                "subnetCIDR": "",
+                "subnetId": ""
+            }
+        }
+
+    def _create_kuryr_net_crd_obj(self, crd_manifest, error_msg):
+        version = 'v1'
+        group = 'openstack.org'
+        plural = 'kuryrnets'
+
+        custom_obj_api = self.k8s_client.CustomObjectsApi()
+        try:
+            custom_obj_api.create_cluster_custom_object(
+                group, version, plural, crd_manifest)
+        except kubernetes.client.rest.ApiException as e:
+            self.assertEqual(e.status, 422)
+            error_body = json.loads(e.body)
+            error_causes = error_body['details']['causes']
+            self.assertTrue(error_msg in
+                            error_causes[0]['message'])
+        else:
+            body = self.k8s_client.V1DeleteOptions()
+            self.addCleanup(custom_obj_api.delete_cluster_custom_object,
+                            group, version, plural,
+                            crd_manifest['metadata']['name'], body)
+            raise Exception('{} for Kuryr Net CRD'.format(error_msg))

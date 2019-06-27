@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import kubernetes
 import time
 
@@ -230,3 +231,86 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             time.sleep(1)
         if time.time() - start >= TIMEOUT_PERIOD:
             raise lib_exc.TimeoutException('Sec group ID still exists')
+
+    @decorators.idempotent_id('09a24a0f-322a-40ea-bb89-5b2246c8725d')
+    def test_create_knp_crd_without_ingress_rules(self):
+        np_name = 'test'
+        knp_obj = dict(self._get_knp_obj(np_name))
+        del knp_obj['spec']['ingressSgRules']
+        error_msg = 'ingressSgRules in body is required'
+        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg)
+
+    @decorators.idempotent_id('f036d26e-f603-4d00-ad92-b409b5a3ee6c')
+    def test_create_knp_crd_without_sg_rule_id(self):
+        np_name = 'test'
+        sg_rule = dict(self._get_sg_rule())
+        del sg_rule['id']
+        knp_obj = self._get_knp_obj(np_name, sg_rule)
+        error_msg = 'security_group_rule.id in body is required'
+        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg)
+
+    @decorators.idempotent_id('47f0e412-3e13-40b2-93e5-503790df870b')
+    def test_create_knp_crd_with_networkpolicy_spec_wrong_type(self):
+        np_name = 'test'
+        knp_obj = dict(self._get_knp_obj(np_name))
+        knp_obj['spec']['networkpolicy_spec'] = []
+        error_msg = 'networkpolicy_spec in body must be of type object'
+        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg)
+
+    def _get_sg_rule(self):
+        return {
+            'description': 'kuryr-kubernetes netpolicy sg rule',
+            'direction': 'egress',
+            'ethertype': 'ipv4',
+            'id': '',
+            'security_group_id': ''
+        }
+
+    def _get_knp_obj(self, name, sg_rule=None, namespace='default'):
+        if not sg_rule:
+            sg_rule = self._get_sg_rule()
+        return {
+            'apiVersion': 'openstack.org/v1',
+            'kind': 'KuryrNetPolicy',
+            'metadata':
+                {
+                    'name': "np-" + name,
+                    'annotations': {
+                        'networkpolicy_name': name,
+                        'networkpolicy_namespace': namespace,
+                        'networkpolicy_uid': ''
+                    }
+                },
+            'spec': {
+                'egressSgRules': [{'security_group_rule': sg_rule}],
+                'ingressSgRules': [],
+                'networkpolicy_spec': {
+                    'podSelector': {},
+                    'policyTypes': ['Ingress'],
+                    'podSelector': {}},
+                'podSelector': {},
+                'securityGroupId': '',
+                'securityGroupName': "sg-" + name}}
+
+    def _create_kuryr_net_policy_crd_obj(self, crd_manifest, error_msg,
+                                         namespace='default'):
+        version = 'v1'
+        group = 'openstack.org'
+        plural = 'kuryrnetpolicies'
+
+        custom_obj_api = self.k8s_client.CustomObjectsApi()
+        try:
+            custom_obj_api.create_namespaced_custom_object(
+                group, version, namespace, plural, crd_manifest)
+        except kubernetes.client.rest.ApiException as e:
+            self.assertEqual(e.status, 422)
+            error_body = json.loads(e.body)
+            error_causes = error_body['details']['causes']
+            self.assertTrue(error_msg in
+                            error_causes[0]['message'])
+        else:
+            body = self.k8s_client.V1DeleteOptions()
+            self.addCleanup(custom_obj_api.delete_namespaced_custom_object,
+                            group, version, namespace, plural,
+                            crd_manifest['metadata']['name'], body)
+            raise Exception('{} for Kuryr Net Policy CRD'.format(error_msg))
