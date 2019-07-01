@@ -48,11 +48,6 @@ KURYR_ROUTE_DEL_VERIFY_TIMEOUT = 30
 KURYR_CONTROLLER = 'kuryr-controller'
 
 
-class MissingCurlOutputInWSSOutput(lib_exc.OtherRestClientException):
-    message = ('The output of the curl command was not found in the output '
-               'streamed from the pod')
-
-
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
@@ -656,12 +651,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             if stderr:
                 LOG.error('Failed to curl the service at {}. '
                           'Err: {}'.format(url, stderr))
-                raise lib_exc.UnexpectedResponseCode()
+                time.sleep(5)
+                return
             try:
                 delimiter = stdout.rfind(status_prefix)
                 if delimiter < 0:
                     LOG.error('Curl output not found in stdout "%s"', stdout)
-                    raise MissingCurlOutputInWSSOutput()
+                    time.sleep(5)
+                    return
                 content = stdout[:delimiter]
                 status_code = int(stdout[delimiter + len(status_prefix):-2])
                 self.assertEqual(requests.codes.OK, status_code,
@@ -670,17 +667,18 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 LOG.info("Failed to parse curl response:%s from pod, "
                          "Exception:%s.", stdout, e)
                 raise e
+            time.sleep(1)
             return content
 
         def pred(tester, responses):
-            unique_resps = set(resp for resp in responses)
+            unique_resps = set(resp for resp in responses if resp)
             tester.assertEqual(amount, len(unique_resps),
                                'Incorrect amount of unique backends. '
                                'Got {}'.format(unique_resps))
 
         self._run_and_assert(req, pred)
 
-    def _run_and_assert(self, fn, predicate, retry_repetitions=10):
+    def _run_and_assert(self, fn, predicate, retry_repetitions=20):
         resps = [fn() for _ in range(retry_repetitions)]
         predicate(self, resps)
 
