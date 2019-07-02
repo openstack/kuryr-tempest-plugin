@@ -19,6 +19,7 @@ import time
 
 from oslo_log import log as logging
 from tempest import config
+from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 
 from kuryr_tempest_plugin.tests.scenario import base
@@ -333,3 +334,36 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
                             group, version, plural,
                             crd_manifest['metadata']['name'], body)
             raise Exception('{} for Kuryr Net CRD'.format(error_msg))
+
+    @decorators.idempotent_id('9e3ddb2d-d765-4ac5-8ab0-6a404adddd49')
+    def test_recreate_pod_in_namespace(self):
+        ns_name = data_utils.rand_name(prefix='kuryr-ns')
+
+        ns_name, ns = self.create_namespace(
+            name=ns_name, wait_for_crd_annotation=False)
+        self.addCleanup(self.delete_namespace, ns_name)
+        pod_name, pod = self.create_pod(
+            namespace=ns_name, wait_for_status=False)
+
+        self.delete_namespace(ns_name)
+        # wait for namespace to be deleted
+        retries = 120
+        while True:
+            try:
+                self.k8s_client.CoreV1Api().read_namespace(ns_name)
+                retries -= 1
+                self.assertNotEqual(0, retries,
+                                    "Timed out waiting for namespace %s to"
+                                    " be deleted" % ns_name)
+                time.sleep(1)
+            except kubernetes.client.rest.ApiException as e:
+                if e.status == 404:
+                    break
+
+        ns_name, ns = self.create_namespace(
+            name=ns_name, wait_for_crd_annotation=False)
+        pod_name, pod = self.create_pod(
+            namespace=ns_name, wait_for_status=False)
+
+        self.wait_for_pod_status(pod_name, namespace=ns_name,
+                                 pod_status='Running', retries=60)
