@@ -234,6 +234,9 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('09a24a0f-322a-40ea-bb89-5b2246c8725d')
     def test_create_knp_crd_without_ingress_rules(self):
+        if not CONF.kuryr_kubernetes.validate_crd:
+            raise self.skipException('CRD validation must be enabled to run '
+                                     'this test.')
         np_name = 'test'
         knp_obj = dict(self._get_knp_obj(np_name))
         del knp_obj['spec']['ingressSgRules']
@@ -242,6 +245,9 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('f036d26e-f603-4d00-ad92-b409b5a3ee6c')
     def test_create_knp_crd_without_sg_rule_id(self):
+        if not CONF.kuryr_kubernetes.validate_crd:
+            raise self.skipException('CRD validation must be enabled to run '
+                                     'this test.')
         np_name = 'test'
         sg_rule = dict(self._get_sg_rule())
         del sg_rule['id']
@@ -251,6 +257,9 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('47f0e412-3e13-40b2-93e5-503790df870b')
     def test_create_knp_crd_with_networkpolicy_spec_wrong_type(self):
+        if not CONF.kuryr_kubernetes.validate_crd:
+            raise self.skipException('CRD validation must be enabled to run '
+                                     'this test.')
         np_name = 'test'
         knp_obj = dict(self._get_knp_obj(np_name))
         knp_obj['spec']['networkpolicy_spec'] = []

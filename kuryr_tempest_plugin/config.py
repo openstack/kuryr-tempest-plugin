@@ -71,4 +71,6 @@ kuryr_k8s_opts = [
                 "have a multi-worker setup"),
     cfg.BoolOpt("cloud_provider", default=False, help="Whether or not a "
                 "cloud provider is set"),
+    cfg.BoolOpt("validate_crd", default=False, help="Whether or not kuryr "
+                "CRDs should be validated"),
 ]

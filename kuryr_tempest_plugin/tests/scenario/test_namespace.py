@@ -282,6 +282,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('90b7cb81-f80e-4ff3-9892-9e5fdcd08289')
     def test_create_kuryrnet_crd_without_net_id(self):
+        if not CONF.kuryr_kubernetes.validate_crd:
+            raise self.skipException('CRD validation must be enabled to run '
+                                     'this test.')
         kuryrnet = dict(self._get_kuryrnet_obj())
         del kuryrnet['spec']['netId']
         error_msg = 'spec.netId in body is required'
@@ -289,6 +292,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('94641749-9fdf-4fb2-a46d-064f75eac113')
     def test_create_kuryrnet_crd_with_populated_as_string(self):
+        if not CONF.kuryr_kubernetes.validate_crd:
+            raise self.skipException('CRD validation must be enabled to run '
+                                     'this test.')
         kuryrnet = dict(self._get_kuryrnet_obj())
         kuryrnet['spec']['populated'] = 'False'
         error_msg = 'spec.populated in body must be of type boolean'
