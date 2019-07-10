@@ -818,7 +818,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         cls.wait_kuryr_annotation(
             group=OS_ROUTES_API, version=OS_ROUTES_VERSION,
             plural=OS_ROUTES_PLURAL,
-            annotation='openstack.org/kuryr-route-state', timeout_period=90,
+            annotation='openstack.org/kuryr-route-state', timeout_period=110,
             name=name)
         LOG.info("Found %s string in Route=%s annotation ",
                  'openstack.org/kuryr-route-state', name)
