@@ -38,6 +38,46 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             raise cls.skipException('Network Policy driver and handler must '
                                     'be enabled to run this tests')
 
+    @decorators.idempotent_id('a9db5bc5-e921-4719-8201-5431537c86f8')
+    def test_ipblock_network_policy_sg_rules(self):
+        ingress_ipblock = "5.5.5.0/24"
+        egress_ipblock = "4.4.4.0/24"
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        np = self.create_network_policy(namespace=namespace_name,
+                                        ingress_ipblock_cidr=ingress_ipblock,
+                                        egress_ipblock_cidr=egress_ipblock,
+                                        ingress_port=2500)
+        LOG.debug("Creating network policy %s", np)
+        self.addCleanup(self.delete_network_policy, np.metadata.name,
+                        namespace_name)
+        network_policy_name = np.metadata.name
+        kuryr_netpolicy_crd_name = 'np-' + network_policy_name
+        kuryrnetpolicies = None
+        start = time.time()
+        while time.time() - start < TIMEOUT_PERIOD:
+            try:
+                kuryrnetpolicies = self.get_kuryr_netpolicy_crds(
+                    name=kuryr_netpolicy_crd_name,
+                    namespace=namespace_name)
+                break
+            except kubernetes.client.rest.ApiException:
+                time.sleep(1)
+                continue
+        self.assertIsNotNone(kuryrnetpolicies)
+        sg_id = kuryrnetpolicies['spec']['securityGroupId']
+        sec_group_rules = self.list_security_group_rules(sg_id)
+        ingress_block_found, egress_block_found = False, False
+        for rule in sec_group_rules:
+            if (rule['direction'] == 'ingress' and
+                    rule['remote_ip_prefix'] == ingress_ipblock):
+                ingress_block_found = True
+            if (rule['direction'] == 'egress' and
+                    rule['remote_ip_prefix'] == egress_ipblock):
+                egress_block_found = True
+        self.assertTrue(ingress_block_found)
+        self.assertTrue(egress_block_found)
+
     @decorators.idempotent_id('24577a9b-1d29-409b-8b60-da3b49d776b1')
     def test_create_delete_network_policy(self):
         np = self.create_network_policy()

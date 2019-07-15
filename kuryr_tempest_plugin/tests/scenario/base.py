@@ -79,25 +79,56 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def create_network_policy(cls, name=None, namespace='default',
-                              match_labels=None):
+                              match_labels=None, match_expressions=None,
+                              ingress_port=None, ingress_port_protocol='TCP',
+                              ingress_ipblock_cidr=None,
+                              ingress_ipblock_except=[],
+                              egress_port=None, egress_port_protocol='TCP',
+                              egress_ipblock_cidr=None,
+                              egress_ipblock_except=[]):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-network-policy')
-        np = cls.k8s_client.V1NetworkPolicy()
+        np = k8s_client.V1NetworkPolicy()
         np.kind = 'NetworkPolicy'
         np.api_version = 'networking.k8s.io/v1'
-        np.metadata = cls.k8s_client.V1ObjectMeta(name=name,
-                                                  namespace=namespace)
-        np.spec = cls.k8s_client.V1NetworkPolicySpec(
-            egress=[cls.k8s_client.V1NetworkPolicyEgressRule(ports=None,
-                                                             to=None)],
-            ingress=[cls.k8s_client.V1NetworkPolicyIngressRule(_from=None,
-                                                               ports=None)],
-            pod_selector=cls.k8s_client.V1LabelSelector(
-                match_expressions=None,
+        np.metadata = k8s_client.V1ObjectMeta(name=name,
+                                              namespace=namespace)
+        to, _from = None, None
+        if egress_ipblock_cidr:
+            to = [k8s_client.V1NetworkPolicyPeer(
+                ip_block=k8s_client.V1IPBlock(cidr=egress_ipblock_cidr,
+                                              _except=egress_ipblock_except))]
+        if ingress_ipblock_cidr:
+            _from = [k8s_client.V1NetworkPolicyPeer(
+                ip_block=k8s_client.V1IPBlock(cidr=ingress_ipblock_cidr,
+                                              _except=ingress_ipblock_except))]
+        if ingress_port:
+            ingress_port = [k8s_client.V1NetworkPolicyPort(
+                port=ingress_port, protocol=ingress_port_protocol)]
+        if egress_port:
+            egress_port = [k8s_client.V1NetworkPolicyPort(
+                port=egress_port, protocol=egress_port_protocol)]
+
+        np.spec = k8s_client.V1NetworkPolicySpec(
+            egress=[k8s_client.V1NetworkPolicyEgressRule(
+                ports=egress_port,
+                to=to)],
+            ingress=[k8s_client.V1NetworkPolicyIngressRule(
+                ports=ingress_port,
+                _from=_from)],
+            pod_selector=k8s_client.V1LabelSelector(
+                match_expressions=match_expressions,
                 match_labels=match_labels),
             policy_types=['Ingress', 'Egress'])
-        return cls.k8s_client.NetworkingV1Api(
+
+        return k8s_client.NetworkingV1Api(
         ).create_namespaced_network_policy(namespace=namespace, body=np)
+
+    @classmethod
+    def list_security_group_rules(cls, security_group_id):
+        rules = cls.os_admin.security_groups_client.show_security_group(
+            security_group_id)['security_group']['security_group_rules']
+        return rules
 
     @classmethod
     def update_network_policy(cls, np):
