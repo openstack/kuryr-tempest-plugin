@@ -17,3 +17,4 @@ POD_AFFINITY = {'requiredDuringSchedulingIgnoredDuringExecution': [
     {'labelSelector': {'matchExpressions': [
         {'operator': 'In', 'values': ['demo'], 'key': 'type'}]},
         'topologyKey': 'kubernetes.io/hostname'}]}
+TIME_TO_APPLY_SGS = 30
