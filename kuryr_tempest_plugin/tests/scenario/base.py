@@ -880,6 +880,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         ip = self.get_pod_ip(name)
         self.assertIsNotNone(ip)
         self.assertTrue(self.ping_ip_address(ip))
+        return pod
 
     def update_config_map_ini_section(
             self, name, conf_to_update, section,

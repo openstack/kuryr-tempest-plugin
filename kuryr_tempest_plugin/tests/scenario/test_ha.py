@@ -89,7 +89,7 @@ class TestHighAvailabilityScenario(base.BaseKuryrScenarioTest):
         self.scale_controller_deployment(1)
 
         # Create a pod and check connectivity
-        self.create_and_ping_pod()
+        pod = self.create_and_ping_pod()
 
         # Get current leader annotation
         annotation = self.get_kuryr_leader_annotation()
@@ -106,6 +106,10 @@ class TestHighAvailabilityScenario(base.BaseKuryrScenarioTest):
         # Create another pod and check connectivity
         self.create_and_ping_pod()
 
+        # Check connectivity to an existing pod
+        self.assertTrue(self.ping_ip_address(self.get_pod_ip(
+            pod.metadata.name)))
+
     @decorators.idempotent_id('afe75fa5-e9ca-4f7d-bc16-8f1dd7884eea')
     def test_scale_down_controller(self):
         controller_deployment = (
@@ -121,13 +125,17 @@ class TestHighAvailabilityScenario(base.BaseKuryrScenarioTest):
         self.scale_controller_deployment(2)
 
         # Create a pod and check connectivity
-        self.create_and_ping_pod()
+        pod = self.create_and_ping_pod()
 
         # Scale the controller down and wait until it stops
         self.scale_controller_deployment(1)
 
         # Create another pod and check connectivity
         self.create_and_ping_pod()
+
+        # Check connectivity to an existing pod
+        self.assertTrue(self.ping_ip_address(self.get_pod_ip(
+            pod.metadata.name)))
 
     @decorators.idempotent_id('3b218c11-c77b-40a8-ba09-5dd5ae0f8ae3')
     def test_auto_fencing(self):
