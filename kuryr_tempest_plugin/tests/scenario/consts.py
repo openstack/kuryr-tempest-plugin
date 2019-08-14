@@ -17,3 +17,4 @@ POD_AFFINITY = {'requiredDuringSchedulingIgnoredDuringExecution': [
     {'labelSelector': {'matchExpressions': [
         {'operator': 'In', 'values': ['demo'], 'key': 'type'}]},
         'topologyKey': 'kubernetes.io/hostname'}]}
+CONTROLLER_LABEL = 'name=kuryr-controller'

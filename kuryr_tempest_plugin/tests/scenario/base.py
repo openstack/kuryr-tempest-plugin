@@ -34,6 +34,8 @@ from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
 from tempest.scenario import manager
 
+from kuryr_tempest_plugin.tests.scenario import consts
+
 CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
@@ -601,10 +603,18 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             namespace=namespace, plural=KURYR_NET_POLICY_CRD_PLURAL,
             name=name, **kwargs)
 
-    def get_pod_name_list(self, namespace="default"):
-        return [pod.metadata.name for pod in
-                self.k8s_client.CoreV1Api().list_namespaced_pod(
-                    namespace=namespace).items]
+    def get_pod_list(self, namespace='default', label_selector=''):
+        return self.k8s_client.CoreV1Api().list_namespaced_pod(
+            namespace=namespace, label_selector=label_selector).items
+
+    def get_pod_name_list(self, namespace='default', label_selector=''):
+        return [pod.metadata.name for pod in self.get_pod_list(
+            namespace=namespace, label_selector=label_selector)]
+
+    def get_controller_pod_names(self):
+        return self.get_pod_name_list(
+            namespace=CONF.kuryr_kubernetes.kube_system_namespace,
+            label_selector=consts.CONTROLLER_LABEL)
 
     def _run_and_assert_fn(self, fn, repeats=10, responses_num=2):
         cmd_outputs = set()
@@ -770,16 +780,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         # Check that the controller pod status doesn't change from provided
         # status parameter, so for example it should stay in Running state when
         # the service with incorrect parameters was created
-
-        controller_pods = [
-            pod.metadata.name for pod in
-            self.k8s_client.CoreV1Api().list_namespaced_pod(
-                namespace=CONF.kuryr_kubernetes.kube_system_namespace).items
-            if pod.metadata.name.startswith(KURYR_CONTROLLER)]
-
         while retry_attempts != 0:
             time.sleep(time_between_attempts)
-            for controller_pod in controller_pods:
+            for controller_pod in self.get_controller_pod_names():
                 self.assertEqual("Running", self.get_pod_status(
                     controller_pod,
                     CONF.kuryr_kubernetes.kube_system_namespace),
@@ -926,29 +929,23 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     def restart_kuryr_controller(self):
         system_namespace = CONF.kuryr_kubernetes.kube_system_namespace
-        kube_system_pods = self.get_pod_name_list(
-            namespace=system_namespace)
-        for kuryr_pod_name in kube_system_pods:
-            if kuryr_pod_name.startswith(KURYR_CONTROLLER):
-                self.delete_pod(
-                    pod_name=kuryr_pod_name,
-                    body={"kind": "DeleteOptions",
-                          "apiVersion": "v1",
-                          "gracePeriodSeconds": 0},
-                    namespace=system_namespace)
+        for kuryr_pod_name in self.get_controller_pod_names():
+            self.delete_pod(
+                pod_name=kuryr_pod_name,
+                body={"kind": "DeleteOptions",
+                      "apiVersion": "v1",
+                      "gracePeriodSeconds": 0},
+                namespace=system_namespace)
 
-                # make sure the kuryr pod was deleted
-                self.wait_for_pod_status(
-                    kuryr_pod_name,
-                    namespace=system_namespace)
+            # make sure the kuryr pod was deleted
+            self.wait_for_pod_status(
+                kuryr_pod_name,
+                namespace=system_namespace)
 
         # Check that new kuryr-controller is up and running
-        kube_system_pods = self.get_pod_name_list(
-            namespace=system_namespace)
-        for kube_system_pod in kube_system_pods:
-            if kube_system_pod.startswith(KURYR_CONTROLLER):
+        for kuryr_pod_name in self.get_controller_pod_names():
                 self.wait_for_pod_status(
-                    kube_system_pod,
+                    kuryr_pod_name,
                     namespace=system_namespace,
                     pod_status='Running',
                     retries=120)
@@ -956,7 +953,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 # Wait until kuryr-controller pools are reloaded, i.e.,
                 # kuryr-controller is ready
                 res = test_utils.call_until_true(
-                    self.get_pod_readiness, 30, 1, kube_system_pod,
+                    self.get_pod_readiness, 30, 1, kuryr_pod_name,
                     namespace=system_namespace, container_name='controller')
                 self.assertTrue(res, 'Timed out waiting for '
                                      'kuryr-controller to reload pools.')
