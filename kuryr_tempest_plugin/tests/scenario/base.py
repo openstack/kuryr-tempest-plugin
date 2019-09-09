@@ -546,7 +546,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                         namespace=namespace)
 
     @classmethod
-    def create_namespace(cls, name=None):
+    def create_namespace(cls, name=None, wait_for_crd_annotation=True):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-namespace')
         kuryr_crd_annotation = K8S_ANNOTATION_PREFIX + "-net-crd"
@@ -561,7 +561,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             time.sleep(1)
             ns = cls.k8s_client.CoreV1Api().read_namespace_status(name)
             if (ns.metadata.annotations and
-                    ns.metadata.annotations.get(kuryr_crd_annotation)):
+                (not wait_for_crd_annotation or
+                    ns.metadata.annotations.get(kuryr_crd_annotation))):
                 break
 
         return name, namespace_obj
