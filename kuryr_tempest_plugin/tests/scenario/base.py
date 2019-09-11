@@ -900,8 +900,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         data_to_update = conf_map.data[conf_to_update]
         conf_parser = six.moves.configparser.ConfigParser()
         conf_parser.readfp(six.moves.StringIO(data_to_update))
-        for key, value in kwargs.iteritems():
-            conf_parser.set(section, key, value)
+        for key, value in kwargs.items():
+            conf_parser.set(section, str(key), str(value))
         # TODO(gcheresh): Create a function that checks all empty string values
         # At the moment only api_root has such a value ('')
         conf_parser.set('kubernetes', 'api_root', '""')
