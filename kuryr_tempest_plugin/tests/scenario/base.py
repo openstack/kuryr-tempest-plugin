@@ -33,8 +33,6 @@ from tempest.lib.common.utils import test_utils
 from tempest.lib import exceptions as lib_exc
 from tempest.scenario import manager
 
-from kuryr_tempest_plugin.tests.scenario import consts
-
 CONF = config.CONF
 LOG = logging.getLogger(__name__)
 
@@ -615,7 +613,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def get_controller_pod_names(self):
         return self.get_pod_name_list(
             namespace=CONF.kuryr_kubernetes.kube_system_namespace,
-            label_selector=consts.CONTROLLER_LABEL)
+            label_selector=CONF.kuryr_kubernetes.controller_label)
 
     def _run_and_assert_fn(self, fn, repeats=10, responses_num=2):
         cmd_outputs = set()

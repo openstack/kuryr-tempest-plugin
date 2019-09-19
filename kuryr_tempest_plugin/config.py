@@ -75,4 +75,6 @@ kuryr_k8s_opts = [
                 "CRDs should be validated"),
     cfg.BoolOpt("configmap_modifiable", default=False, help="Whether config "
                 "map can be changed"),
+    cfg.StrOpt("controller_label", default="name=kuryr-controller",
+               help="The label is used to identify the Kuryr controller pods"),
 ]
