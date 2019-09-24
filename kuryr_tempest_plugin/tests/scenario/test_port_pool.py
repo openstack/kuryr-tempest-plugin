@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import testtools
 import time
 
 from oslo_concurrency import lockutils
@@ -120,6 +121,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             pod_name3, cmd, namespace=namespace_name), '0')
 
     @decorators.idempotent_id('bddd5441-1244-429d-a125-b55ddfb134a9')
+    @testtools.skipUnless(
+        CONF.kuryr_kubernetes.configmap_modifiable,
+        "Config map must be modifiable")
     @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_update(self):
         UPDATED_POOL_BATCH = 3
@@ -174,6 +178,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             pod_name2, cmd, namespace=namespace_name), '0')
 
     @decorators.idempotent_id('bddd5441-1244-459d-a133-b56ddfb147a6')
+    @testtools.skipUnless(
+        CONF.kuryr_kubernetes.configmap_modifiable,
+        "Config map must be modifiable")
     @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_noop_update(self):
         KUBERNETES_SECTION = 'kubernetes'
@@ -254,6 +261,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         self.assertEqual(num_to_compare, new_port_list_num)
 
     @decorators.idempotent_id('bddd5441-1244-429d-a123-b55ddfb137a6')
+    @testtools.skipUnless(
+        CONF.kuryr_kubernetes.configmap_modifiable,
+        "Config map must be modifiable")
     @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_min_max_update(self):
         POOL_BATCH = 2
