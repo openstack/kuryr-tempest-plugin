@@ -25,6 +25,9 @@ from kuryr_tempest_plugin.tests.scenario import consts
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
+PREPOPULAION_RETRIES = 60
+NON_PREPOPULAION_RETRIES = 5
+
 
 class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     CONFIG_MAP_NAME = 'kuryr-config'
@@ -64,9 +67,31 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         self.addCleanup(self.delete_namespace, namespace_name)
         subnet_id = self.get_subnet_id_for_ns(namespace_name)
 
-        # check the original length of list of ports for new ns
+        num_nodes = len(self.k8s_client.CoreV1Api().list_node().items)
+        if CONF.kuryr_kubernetes.prepopulation_enabled:
+            num_ports_initial = num_nodes * (int(self.PORTS_POOL_DEFAULT_DICT[
+                'ports_pool_batch'])/2) + 1
+            retries = PREPOPULAION_RETRIES
+        else:
+            num_ports_initial = 1
+            retries = NON_PREPOPULAION_RETRIES
         port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+
+        # Make sure we have the right number of ports after namespace creation
+        while port_list_num != num_ports_initial:
+            retries -= 1
+            if retries == 0:
+                self.assertNotEqual(0, retries, "Timed out waiting for port "
+                                    "prepopulation for namespace %s to end. "
+                                    "Expected %d ports, "
+                                    "found %d" % (namespace_name,
+                                                  num_ports_initial,
+                                                  port_list_num))
+            time.sleep(3)
+            port_list_num = len(self.os_admin.ports_client.list_ports(
+                fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+
         # create a pod to test the port pool increase
         pod_name1, _ = self.create_pod(namespace=namespace_name,
                                        labels={'type': 'demo'})

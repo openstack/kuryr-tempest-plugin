@@ -77,4 +77,6 @@ kuryr_k8s_opts = [
                 "map can be changed"),
     cfg.StrOpt("controller_label", default="name=kuryr-controller",
                help="The label is used to identify the Kuryr controller pods"),
+    cfg.BoolOpt("prepopulation_enabled", default=False,
+                help="Whether prepopulation of ports is enabled"),
 ]
