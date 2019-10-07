@@ -79,4 +79,6 @@ kuryr_k8s_opts = [
                help="The label is used to identify the Kuryr controller pods"),
     cfg.BoolOpt("prepopulation_enabled", default=False,
                 help="Whether prepopulation of ports is enabled"),
+    cfg.BoolOpt("subnet_per_namespace", default=False,
+                help="Whether there is a subnet per each namespace"),
 ]

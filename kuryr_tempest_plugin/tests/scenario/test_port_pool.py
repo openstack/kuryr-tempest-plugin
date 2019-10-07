@@ -37,8 +37,8 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     @classmethod
     def skip_checks(cls):
         super(TestPortPoolScenario, cls).skip_checks()
-        if not CONF.kuryr_kubernetes.namespace_enabled:
-            raise cls.skipException('Namespace driver and handler must be '
+        if not CONF.kuryr_kubernetes.subnet_per_namespace:
+            raise cls.skipException('Subnet per namespace must be '
                                     'enabled to run these tests')
         if not CONF.kuryr_kubernetes.port_pool_enabled:
             raise cls.skipException(
