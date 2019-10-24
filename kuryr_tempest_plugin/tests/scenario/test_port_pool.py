@@ -132,10 +132,23 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             namespace=namespace_name,
             affinity={'podAffinity': consts.POD_AFFINITY})
 
-        # the total number of ports should stay the same
+        # Check the number of pods based on the values of the ports_pool_batch
+        # and ports_pool_min. If the difference between the values is greater
+        # than two it means that once we create another pod ports_pool_patch
+        # number of ports will be created, If the difference is more than two
+        # no new ports will be created once we create a new pod
         updated3_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-        self.assertEqual(updated_port_list_num, updated3_port_list_num)
+        ports_pool_batch = int(self.PORTS_POOL_DEFAULT_DICT[
+                               'ports_pool_batch'])
+        ports_pool_min = int(self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
+        population_threshold = ports_pool_batch - ports_pool_min
+
+        if population_threshold < 3:
+            num_ports_expected = ports_pool_batch * 2 + 1
+        else:
+            num_ports_expected = ports_pool_batch + 1
+        self.assertEqual(num_ports_expected, updated3_port_list_num)
 
         # check connectivity between pods
         pod_ip = self.get_pod_ip(pod_name1, namespace=namespace_name)
