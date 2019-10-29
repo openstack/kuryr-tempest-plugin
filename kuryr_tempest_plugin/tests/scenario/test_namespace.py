@@ -34,9 +34,10 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
     @classmethod
     def skip_checks(cls):
         super(TestNamespaceScenario, cls).skip_checks()
-        if not CONF.kuryr_kubernetes.namespace_enabled:
-            raise cls.skipException('Namespace driver and handler must be '
-                                    'enabled to run this tests')
+        if not CONF.kuryr_kubernetes.subnet_per_namespace:
+            raise cls.skipException('Namespace handler and namespace subnet '
+                                    'driver must be enabled to run these '
+                                    'tests')
 
     @classmethod
     def setup_clients(cls):
@@ -91,6 +92,10 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bdde5441-1b44-449d-a125-b5fdbfb1a2a9')
     def test_namespace_sg_isolation(self):
+        if not CONF.kuryr_kubernetes.namespace_enabled:
+            raise self.skipException('No need to run Namespace Isolation when '
+                                     'the security group driver is not '
+                                     'namespace')
         # Check security group resources are created
         ns1_name, ns1 = self.create_namespace()
         ns2_name, ns2 = self.create_namespace()
@@ -178,6 +183,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('b43f5421-1244-449d-a125-b5fddfb1a2a9')
     def test_namespace_sg_svc_isolation(self):
+        if not CONF.kuryr_kubernetes.namespace_enabled:
+            raise self.skipException('No need to run Namespace Isolation when '
+                                     'Namespace driver is not enabled')
         # Check security group resources are created
         ns1_name, ns1 = self.create_namespace()
         ns2_name, ns2 = self.create_namespace()
