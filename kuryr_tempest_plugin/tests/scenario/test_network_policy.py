@@ -281,7 +281,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         knp_obj = dict(self._get_knp_obj(np_name))
         del knp_obj['spec']['ingressSgRules']
         error_msg = 'ingressSgRules in body is required'
-        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg)
+        field = 'ingressSgRules'
+        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg, field)
 
     @decorators.idempotent_id('f036d26e-f603-4d00-ad92-b409b5a3ee6c')
     def test_create_knp_crd_without_sg_rule_id(self):
@@ -293,7 +294,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         del sg_rule['id']
         knp_obj = self._get_knp_obj(np_name, sg_rule)
         error_msg = 'security_group_rule.id in body is required'
-        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg)
+        field = 'security_group_rule.id'
+        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg, field)
 
     @decorators.idempotent_id('47f0e412-3e13-40b2-93e5-503790df870b')
     def test_create_knp_crd_with_networkpolicy_spec_wrong_type(self):
@@ -304,7 +306,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         knp_obj = dict(self._get_knp_obj(np_name))
         knp_obj['spec']['networkpolicy_spec'] = []
         error_msg = 'networkpolicy_spec in body must be of type object'
-        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg)
+        field = 'networkpolicy_spec'
+        self._create_kuryr_net_policy_crd_obj(knp_obj, error_msg, field)
 
     def _get_sg_rule(self):
         return {
@@ -342,7 +345,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
                 'securityGroupName': "sg-" + name}}
 
     def _create_kuryr_net_policy_crd_obj(self, crd_manifest, error_msg,
-                                         namespace='default'):
+                                         field, namespace='default'):
         version = 'v1'
         group = 'openstack.org'
         plural = 'kuryrnetpolicies'
@@ -355,8 +358,13 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             self.assertEqual(e.status, 422)
             error_body = json.loads(e.body)
             error_causes = error_body['details']['causes']
-            self.assertTrue(error_msg in
-                            error_causes[0]['message'])
+            err_msg_cause = error_causes[0].get('message', "")
+            err_field_cause = error_causes[0].get('field', "[]")
+            if err_field_cause != "[]":
+                self.assertTrue(field in
+                                err_field_cause)
+            else:
+                self.assertTrue(error_msg in err_msg_cause)
         else:
             body = self.k8s_client.V1DeleteOptions()
             self.addCleanup(custom_obj_api.delete_namespaced_custom_object,
