@@ -551,25 +551,6 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             cls.verify_lbaas_endpoints_configured(service_name, pod_num,
                                                   namespace)
             cls.service_name = service_name
-            if spec_type != 'ClusterIP':
-                # FIXME(ltomasbo): adding workaround to use the clusterIP to
-                # check service status as there are some issues with the FIPs
-                # and OVN gates
-                clusterip_ip = cls.get_service_ip(service_name,
-                                                  spec_type="ClusterIP",
-                                                  namespace=namespace)
-                cls.wait_service_status(clusterip_ip,
-                                        CONF.kuryr_kubernetes.lb_build_timeout,
-                                        protocol, port,
-                                        num_of_back_ends=pod_num)
-                actual_be = cls.wait_ep_members_status(
-                    cls.service_name, namespace,
-                    CONF.kuryr_kubernetes.lb_build_timeout)
-                if pod_num != actual_be:
-                    LOG.error("Actual EP backend num(%d) != pod_num(%d)",
-                              actual_be, pod_num)
-                    raise lib_exc.ServerFault()
-
         if cleanup:
             cls.addClassResourceCleanup(cls.delete_service, service_name,
                                         namespace=namespace)
@@ -701,9 +682,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         self._run_and_assert(req, pred)
 
-    def assert_backend_amount_from_pod(self, url, amount, pod,
+    def assert_backend_amount_from_pod(self, server_ip, amount, pod,
+                                       server_port=None,
+                                       protocol='TCP',
                                        namespace_name='default'):
-        def req():
+        def req_tcp():
+            url = "http://{}".format(server_ip)
             status_prefix = '\nkuryr-tempest-plugin-curl-http_code:"'
             cmd = ['/usr/bin/curl', '-Ss', '-w',
                    status_prefix + '%{http_code}"\n', url]
@@ -733,12 +717,39 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             time.sleep(1)
             return content
 
+        def req_udp():
+            cmd = "/bin/printf hello|/bin/nc -w 5 -u {} {}".format(
+                server_ip, server_port)
+            pod_cmd = ["/bin/sh", "-c", cmd]
+            stdout, stderr = self.exec_command_in_pod(pod, pod_cmd,
+                                                      namespace=namespace_name,
+                                                      stderr=True)
+            if stderr:
+                LOG.error('Failed to reach service at {}:{} '
+                          'Err: {}'.format(server_ip, server_port, stderr))
+                time.sleep(10)
+                return
+            return stdout
+
         def pred(tester, responses):
-            unique_resps = set(resp for resp in responses if resp)
+            if protocol == 'TCP':
+                unique_resps = set(resp for resp in responses if resp)
+            else:
+                unique_resps = set(resp for resp in responses if resp
+                                   is not '')
             tester.assertEqual(amount, len(unique_resps),
                                'Incorrect amount of unique backends. '
                                'Got {}'.format(unique_resps))
 
+        if protocol == 'TCP':
+            req = req_tcp
+        elif protocol == "UDP":
+            self.assertIsNotNone(server_port, "server_port must be "
+                                              "provided for UDP protocol")
+            req = req_udp
+        else:
+            LOG.info("Unsupported protocol %s, returning", protocol)
+            return
         self._run_and_assert(req, pred)
 
     def _run_and_assert(self, fn, predicate, retry_repetitions=100):
@@ -1015,3 +1026,19 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         self.addCleanup(self.delete_pod, pod2_name)
         pod_name_list.extend((pod1_name, pod2_name))
         return pod_name_list
+
+    def check_service_internal_connectivity(self, service_port='80',
+                                            protocol='TCP'):
+        # FIXME(itzikb): Use the clusterIP to
+        # check service status as there are some issues with the FIPs
+        # and OVN gates
+        clusterip_svc_ip = self.get_service_ip(self.service_name,
+                                               spec_type='ClusterIP')
+        pod_name, pod = self.create_pod()
+        self.addClassResourceCleanup(self.delete_pod, pod_name)
+        self.assert_backend_amount_from_pod(
+            clusterip_svc_ip,
+            self.pod_num,
+            pod_name,
+            service_port,
+            protocol)
