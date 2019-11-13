@@ -147,14 +147,14 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         self.assertEqual(crd_pod_selector.get('matchLabels'),
                          match_labels)
 
-        match_labels = {'context': 'demo'}
+        label_key = 'context'
+        match_labels = {label_key: 'demo'}
         np = self.read_network_policy(np)
         np.spec.pod_selector.match_labels = match_labels
         np = self.update_network_policy(np)
 
         labels = {}
         start = time.time()
-        label_key = match_labels.keys()[0]
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
