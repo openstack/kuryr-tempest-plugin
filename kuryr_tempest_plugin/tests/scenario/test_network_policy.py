@@ -26,7 +26,7 @@ from kuryr_tempest_plugin.tests.scenario import base
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
-TIMEOUT_PERIOD = 20
+TIMEOUT_PERIOD = 120
 
 
 class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
