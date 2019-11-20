@@ -297,7 +297,8 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         kuryrnet = dict(self._get_kuryrnet_obj())
         del kuryrnet['spec']['netId']
         error_msg = 'spec.netId in body is required'
-        self._create_kuryr_net_crd_obj(kuryrnet, error_msg)
+        field = 'spec.netId'
+        self._create_kuryr_net_crd_obj(kuryrnet, error_msg, field)
 
     @decorators.idempotent_id('94641749-9fdf-4fb2-a46d-064f75eac113')
     def test_create_kuryrnet_crd_with_populated_as_string(self):
@@ -307,7 +308,8 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         kuryrnet = dict(self._get_kuryrnet_obj())
         kuryrnet['spec']['populated'] = 'False'
         error_msg = 'spec.populated in body must be of type boolean'
-        self._create_kuryr_net_crd_obj(kuryrnet, error_msg)
+        field = 'populated'
+        self._create_kuryr_net_crd_obj(kuryrnet, error_msg, field)
 
     def _get_kuryrnet_obj(self):
         return {
@@ -327,7 +329,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
             }
         }
 
-    def _create_kuryr_net_crd_obj(self, crd_manifest, error_msg):
+    def _create_kuryr_net_crd_obj(self, crd_manifest, error_msg, field):
         version = 'v1'
         group = 'openstack.org'
         plural = 'kuryrnets'
@@ -340,8 +342,13 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
             self.assertEqual(e.status, 422)
             error_body = json.loads(e.body)
             error_causes = error_body['details']['causes']
-            self.assertTrue(error_msg in
-                            error_causes[0]['message'])
+            err_msg_cause = error_causes[0].get('message', "")
+            err_field_cause = error_causes[0].get('field', "[]")
+            if err_field_cause != "[]":
+                self.assertTrue(field in
+                                err_field_cause)
+            else:
+                self.assertTrue(error_msg in err_msg_cause)
         else:
             body = self.k8s_client.V1DeleteOptions()
             self.addCleanup(custom_obj_api.delete_cluster_custom_object,
