@@ -181,6 +181,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
                 namespace_name=namespace)
         return pod_name, svc_ip
 
+    @decorators.unstable_test(bug='1853603')
     @decorators.idempotent_id('b43f5421-1244-449d-a125-b5fddfb1a2a9')
     def test_namespace_sg_svc_isolation(self):
         if not CONF.kuryr_kubernetes.namespace_enabled:
