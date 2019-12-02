@@ -173,11 +173,11 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         # Wait for service to be ready
         if checking_pod:
             self.assert_backend_amount_from_pod(
-                'http://{}'.format(svc_ip), 1, checking_pod,
+                svc_ip, 1, checking_pod,
                 namespace_name='default')
         else:
             self.assert_backend_amount_from_pod(
-                'http://{}'.format(svc_ip), 1, pod_name,
+                svc_ip, 1, pod_name,
                 namespace_name=namespace)
         return pod_name, svc_ip
 

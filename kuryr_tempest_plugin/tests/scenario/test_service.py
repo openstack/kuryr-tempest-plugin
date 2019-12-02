@@ -41,7 +41,7 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name)
         self.assert_backend_amount_from_pod(
-            'http://{}'.format(self.service_ip),
+            self.service_ip,
             self.pod_num,
             pod_name)
 
@@ -63,6 +63,7 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
     def test_lb_service_http(self):
+        self.check_service_internal_connectivity()
 
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
         self.assert_backend_amount(self.service_ip, self.pod_num)
@@ -70,6 +71,7 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
     # TODO(yboaron): Use multi threads for 'test_vm_service_http' test
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1b5a9')
     def test_vm_service_http(self):
+        self.check_service_internal_connectivity()
         ssh_client, fip = self.create_vm_for_connectivity_test()
         LOG.info("Trying to curl the service IP %s from VM" % self.service_ip)
         cmd = ("curl {dst_ip}".format(dst_ip=self.service_ip))
@@ -82,6 +84,7 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
     def test_unsupported_service_type(self):
         # Testing that kuryr controller didn't crash for 100 seconds since
         # creation of service with unsupported type
+        self.check_service_internal_connectivity()
         self.create_setup_for_service_test(spec_type="NodePort", get_ip=False)
         self.check_controller_pod_status_for_time_period()
 
@@ -101,12 +104,9 @@ class TestUdpServiceScenario(base.BaseKuryrScenarioTest):
         # NOTE(ltomasbo): Using LoadBalancer type to avoid namespace isolation
         # restrictions as this test targets svc udp testing and not the
         # isolation
-        self.create_setup_for_service_test(spec_type="LoadBalancer",
-                                           protocol="UDP", port=90,
+        self.create_setup_for_service_test(protocol="UDP", port=90,
                                            target_port=9090)
         # NOTE(ltomasbo): Ensure usage of svc clusterIP IP instead of the FIP
         # as the focus of this test is not to check FIP connectivity.
-        clusterip_svc_ip = self.get_service_ip(self.service_name,
-                                               spec_type='ClusterIP')
-        self.assert_backend_amount(clusterip_svc_ip, self.pod_num,
-                                   server_port=90, protocol="UDP")
+        self.check_service_internal_connectivity(service_port='90',
+                                                 protocol='UDP')
