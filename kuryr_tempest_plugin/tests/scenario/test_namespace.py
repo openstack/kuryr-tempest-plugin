@@ -388,4 +388,4 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
             namespace=ns_name, wait_for_status=False)
 
         self.wait_for_pod_status(pod_name, namespace=ns_name,
-                                 pod_status='Running', retries=60)
+                                 pod_status='Running', retries=180)
