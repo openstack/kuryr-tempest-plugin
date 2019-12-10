@@ -60,25 +60,18 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                      if n['name'] == subnet_name][0]
         return subnet_id
 
-    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a3aa')
-    @lockutils.synchronized('port-pool-restarts')
-    def test_port_pool(self):
-        namespace_name, namespace = self.create_namespace()
-        self.addCleanup(self.delete_namespace, namespace_name)
-        subnet_id = self.get_subnet_id_for_ns(namespace_name)
-
+    def check_initial_ports_num(self, subnet_id, namespace_name, pool_batch):
+        # check the original length of list of ports for new ns
         num_nodes = len(self.k8s_client.CoreV1Api().list_node().items)
         if CONF.kuryr_kubernetes.prepopulation_enabled:
-            num_ports_initial = num_nodes * (int(self.PORTS_POOL_DEFAULT_DICT[
-                'ports_pool_batch'])/2) + 1
+            num_ports_initial = num_nodes * (int(pool_batch/2) + 1)
             retries = PREPOPULAION_RETRIES
         else:
             num_ports_initial = 1
             retries = NON_PREPOPULAION_RETRIES
+
         port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-
-        # Make sure we have the right number of ports after namespace creation
         while port_list_num != num_ports_initial:
             retries -= 1
             if retries == 0:
@@ -91,6 +84,18 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             time.sleep(3)
             port_list_num = len(self.os_admin.ports_client.list_ports(
                 fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        return port_list_num
+
+    @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a3aa')
+    @lockutils.synchronized('port-pool-restarts')
+    def test_port_pool(self):
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+        pool_batch = self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch']
+        port_list_num = self.check_initial_ports_num(subnet_id,
+                                                     namespace_name,
+                                                     pool_batch)
 
         # create a pod to test the port pool increase
         pod_name1, _ = self.create_pod(namespace=namespace_name,
@@ -164,7 +169,8 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         "Config map must be modifiable")
     @lockutils.synchronized('port-pool-restarts')
     def test_port_pool_update(self):
-        UPDATED_POOL_BATCH = 3
+        UPDATED_POOL_BATCH = int(self.PORTS_POOL_DEFAULT_DICT[
+            'ports_pool_batch']) + 2
 
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
@@ -185,8 +191,10 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             ports_pool_min=self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
 
         # check the original length of list of ports for new ns
-        port_list_num = len(self.os_admin.ports_client.list_ports(
-            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        initial_port_list_num = self.check_initial_ports_num(
+            subnet_id,
+            namespace_name,
+            UPDATED_POOL_BATCH)
         # create a pod to test the port pool increase by updated value
         pod_name1, pod1 = self.create_pod(namespace=namespace_name,
                                           labels={'type': 'demo'})
@@ -194,8 +202,11 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # port number should increase by updated ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-        num_to_compare = updated_port_list_num - UPDATED_POOL_BATCH
-        self.assertEqual(num_to_compare, port_list_num)
+        if not CONF.kuryr_kubernetes.prepopulation_enabled:
+            num_to_compare = updated_port_list_num - initial_port_list_num
+        else:
+            num_to_compare = UPDATED_POOL_BATCH
+        self.assertEqual(num_to_compare, UPDATED_POOL_BATCH)
 
         # create additional pod
         pod_name2, pod2 = self.create_pod(
@@ -261,8 +272,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             vif_pool_driver=vif_pool_driver)
 
         # check the original length of list of ports for new ns
-        port_list_num = len(self.os_admin.ports_client.list_ports(
-            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        initial_ports_num = self.check_initial_ports_num(subnet_id,
+                                                         namespace_name,
+                                                         1)
         # create a pod to test the port pool increase by 1
         self.create_pod(namespace=namespace_name, labels={'type': 'demo'})
 
@@ -270,7 +282,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         new_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
 
-        self.assertEqual(port_list_num+1, new_port_list_num)
+        self.assertEqual(initial_ports_num+1, new_port_list_num)
 
         # update pools_vif_drivers and vif_pool_driver to the previous values
         if update_pools_vif_drivers:
@@ -297,6 +309,16 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         num_to_compare = updated_port_list_num - int(
             self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch'])
         self.assertEqual(num_to_compare, new_port_list_num)
+
+    def check_ports_num_increase(self, expected_num_ports,
+                                 subnet_id, retries=5):
+        for i in range(retries):
+            port_list_num = len(self.os_admin.ports_client.list_ports(
+                fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+            if port_list_num == expected_num_ports:
+                break
+            time.sleep(5)
+        return port_list_num
 
     @decorators.idempotent_id('bddd5441-1244-429d-a123-b55ddfb137a6')
     @testtools.skipUnless(
@@ -327,9 +349,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             ports_pool_max=self.PORTS_POOL_DEFAULT_DICT['ports_pool_max'],
             ports_pool_min=self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
 
-        # check the original length of list of ports for new ns
-        initial_ports_num = len(self.os_admin.ports_client.list_ports(
-            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
+        initial_ports_num = self.check_initial_ports_num(subnet_id,
+                                                         namespace_name,
+                                                         POOL_BATCH)
         # create a pod to test the port pool increase by updated batch value
         pod_name1, pod1 = self.create_pod(namespace=namespace_name,
                                           labels={'type': 'demo'})
@@ -337,8 +359,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # port number should increase by updated ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-        num_to_compare = updated_port_list_num - POOL_BATCH
-        self.assertEqual(num_to_compare, initial_ports_num)
+        updated_port_list_num = self.check_ports_num_increase(
+            initial_ports_num + POOL_BATCH, subnet_id)
+        self.assertEqual(updated_port_list_num, initial_ports_num + POOL_BATCH)
 
         # need to wait till ports_pool_update_frequency expires so new batch
         # creation could be executed in order to create additional pod
@@ -350,16 +373,21 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
 
         # the total number of ports should increase by 2 as there is only 1
         # port free and POOL_MIN=1, so new port batch will be created
-        updated2_port_list_num = len(self.os_admin.ports_client.list_ports(
-            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
-        num_to_compare = updated2_port_list_num - 2 * POOL_BATCH
-        self.assertEqual(num_to_compare, initial_ports_num)
+        # We wait a bit because sometimes it takes a while for the ports to be
+        # created
+
+        updated2_port_list_num = self.check_ports_num_increase(
+            initial_ports_num + 2 * POOL_BATCH, subnet_id)
+        self.assertEqual(updated2_port_list_num,
+                         initial_ports_num + 2 * POOL_BATCH)
 
         # create additional pod
         pod_name3, pod3 = self.create_pod(
             namespace=namespace_name,
             affinity={'podAffinity': consts.POD_AFFINITY})
 
+        # We wait to make sure no additional ports are created
+        time.sleep(30)
         # the total number of ports should stay the same
         updated3_port_list_num = len(self.os_admin.ports_client.list_ports(
             fixed_ips='subnet_id=%s' % subnet_id)['ports'])
