@@ -39,6 +39,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
                                     'be enabled to run this tests')
 
     @decorators.idempotent_id('a9db5bc5-e921-4719-8201-5431537c86f8')
+    @decorators.unstable_test(bug=1860554)
     def test_ipblock_network_policy_sg_rules(self):
         ingress_ipblock = "5.5.5.0/24"
         egress_ipblock = "4.4.4.0/24"
