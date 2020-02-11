@@ -55,6 +55,8 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
             raise cls.skipException("Floating ips are not available")
         if not CONF.kuryr_kubernetes.service_tests_enabled:
             raise cls.skipException("Service tests are not enabled")
+        if CONF.kuryr_kubernetes.ipv6:
+            raise cls.skipException('FIPs are not supported with IPv6')
 
     @classmethod
     def resource_setup(cls):

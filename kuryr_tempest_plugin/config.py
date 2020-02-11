@@ -81,4 +81,7 @@ kuryr_k8s_opts = [
                 help="Whether prepopulation of ports is enabled"),
     cfg.BoolOpt("subnet_per_namespace", default=False,
                 help="Whether there is a subnet per each namespace"),
+    cfg.BoolOpt("ipv6", default=False,
+                help="True if Kuryr is configured to use IPv6 subnets as pod "
+                     "and service subnets."),
 ]

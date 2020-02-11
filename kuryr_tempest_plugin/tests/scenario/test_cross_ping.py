@@ -33,6 +33,8 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a1a8')
     def test_vm_pod_ping(self):
+        if CONF.kuryr_kubernetes.ipv6:
+            raise self.skipException('FIPs are not supported with IPv6')
 
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name, pod)
@@ -57,6 +59,9 @@ class TestCrossPingScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fddfb1a1a8')
     def test_pod_vm_ping(self):
+        if CONF.kuryr_kubernetes.ipv6:
+            raise self.skipException('FIPs are not supported with IPv6')
+
         _, fip = self.create_vm_for_connectivity_test()
         pod_name, pod = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name, pod)
