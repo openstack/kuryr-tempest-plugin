@@ -16,6 +16,7 @@ import six.moves
 from functools import partial
 import ipaddress
 import json
+import six
 import socket
 import time
 
@@ -442,7 +443,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                              expected_different_replies=1):
 
         def verify_tcp(dest_ip, port, session):
-            addr = ipaddress.ip_address(dest_ip)
+            addr = ipaddress.ip_address(six.text_type(dest_ip))
             if addr.version == 6:
                 dest_ip = '[%s]' % dest_ip
             try:
@@ -692,7 +693,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                        namespace_name='default'):
         def req_tcp():
             ip = server_ip
-            if ipaddress.ip_address(ip).version == 6:
+            if ipaddress.ip_address(six.text_type(ip)).version == 6:
                 ip = '[%s]' % ip
             url = "http://{}".format(ip)
             status_prefix = '\nkuryr-tempest-plugin-curl-http_code:"'
