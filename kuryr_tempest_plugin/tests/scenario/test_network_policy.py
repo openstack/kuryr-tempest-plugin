@@ -22,6 +22,7 @@ from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
+from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -79,6 +80,104 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         self.assertTrue(ingress_block_found)
         self.assertTrue(egress_block_found)
 
+    @decorators.idempotent_id('a9db5bc5-e921-4819-8301-5431437c76f8')
+    def test_ipblock_network_policy_allow_except(self):
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        allow_all_cidr = '0.0.0.0/0'
+        pod_ip_list = []
+        pod_name_list = []
+        cmd_list = []
+
+        for i in range(4):
+            pod_name, pod = self.create_pod(namespace=namespace_name)
+            self.addCleanup(self.delete_pod, pod_name, pod,
+                            namespace=namespace_name)
+            pod_name_list.append(pod_name)
+            pod_ip = self.get_pod_ip(pod_name, namespace=namespace_name)
+            pod_ip_list.append(pod_ip)
+            cmd = ["/bin/sh", "-c", "curl {dst_ip}:8080".format(
+                dst_ip=pod_ip_list[i])]
+            cmd_list.append(cmd)
+
+        # Check connectivity from pod4 to other pods before creating NP
+        for i in range(3):
+            self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+                pod_name_list[3], cmd_list[i], namespace=namespace_name))
+        # Check connectivity from pod1 to pod4 before creating NP
+        self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+            pod_name_list[0], cmd_list[3], namespace=namespace_name))
+
+        # Create NP allowing all besides first pod on ingress
+        # and second pod on egress
+        np = self.create_network_policy(
+            namespace=namespace_name, ingress_ipblock_cidr=allow_all_cidr,
+            ingress_ipblock_except=[pod_ip_list[0]+'/32'],
+            egress_ipblock_cidr=allow_all_cidr,
+            egress_ipblock_except=[pod_ip_list[1]+'/32'])
+
+        LOG.debug("Creating network policy %s", np)
+        network_policy_name = np.metadata.name
+        kuryr_netpolicy_crd_name = 'np-' + network_policy_name
+
+        start = time.time()
+        while time.time() - start < TIMEOUT_PERIOD:
+            try:
+                self.get_kuryr_netpolicy_crds(
+                    name=kuryr_netpolicy_crd_name, namespace=namespace_name)
+                break
+            except kubernetes.client.rest.ApiException:
+                time.sleep(1)
+                continue
+
+        # Wait for network policy to be created
+        time.sleep(consts.TIME_TO_APPLY_SGS)
+
+        # Check that http connection from pod1 to pod4 is blocked
+        # after creating NP
+        self.assertNotIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+            pod_name_list[0], cmd_list[3], namespace=namespace_name))
+
+        # Check that http connection from pod4 to pod2 is blocked
+        # after creating NP
+        self.assertNotIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+            pod_name_list[3], cmd_list[1], namespace=namespace_name))
+
+        # Check that http connection from pod4 to pod1 is not blocked
+        self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+            pod_name_list[3], cmd_list[0], namespace=namespace_name))
+
+        # Check that there is still http connection to pod3
+        # from pod4 as it's not blocked by IPblock rules
+        self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+            pod_name_list[3], cmd_list[2], namespace=namespace_name))
+
+        # Delete network policy and check that there is still http connection
+        # between pods
+        np_exist = True
+        self.delete_network_policy(np.metadata.name, namespace_name)
+
+        start = time.time()
+        while time.time() - start < TIMEOUT_PERIOD:
+            try:
+                time.sleep(1)
+                self.get_kuryr_netpolicy_crds(
+                    name=kuryr_netpolicy_crd_name, namespace=namespace_name)
+            except kubernetes.client.rest.ApiException as e:
+                if e.status == 404:
+                    np_exist = False
+                    break
+                else:
+                    continue
+        self.assertFalse(np_exist)
+
+        for i in range(3):
+            self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+                pod_name_list[3], cmd_list[i], namespace=namespace_name))
+        for i in range(1, 4):
+            self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+                pod_name_list[0], cmd_list[i], namespace=namespace_name))
+
     @decorators.idempotent_id('24577a9b-1d29-409b-8b60-da3b49d776b1')
     def test_create_delete_network_policy(self):
         np = self.create_network_policy()
@@ -132,6 +231,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
                         np.metadata.name)
         kuryr_netpolicy_crd_name = 'np-' + np.metadata.name
         kuryrnetpolicies = ''
+
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
@@ -141,6 +241,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             except kubernetes.client.rest.ApiException:
                 time.sleep(1)
                 continue
+
         if not kuryrnetpolicies:
             raise lib_exc.TimeoutException()
 
