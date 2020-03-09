@@ -41,6 +41,7 @@ LOG = logging.getLogger(__name__)
 KURYR_CRD_GROUP = 'openstack.org'
 KURYR_CRD_VERSION = 'v1'
 KURYR_NET_CRD_PLURAL = 'kuryrnets'
+KURYR_NETWORK_CRD_PLURAL = 'kuryrnetworks'
 KURYR_NET_POLICY_CRD_PLURAL = 'kuryrnetpolicies'
 K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
@@ -561,24 +562,37 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                         namespace=namespace)
 
     @classmethod
-    def create_namespace(cls, name=None, wait_for_crd_annotation=True):
+    def create_namespace(cls, name=None, wait_for_crd=True):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-namespace')
-        kuryr_crd_annotation = K8S_ANNOTATION_PREFIX + "-net-crd"
-
         namespace = cls.k8s_client.V1Namespace()
         namespace.metadata = cls.k8s_client.V1ObjectMeta(name=name)
         namespace_obj = cls.k8s_client.CoreV1Api().create_namespace(
             body=namespace)
 
-        # wait until namespace gets created
-        while True:
-            time.sleep(1)
-            ns = cls.k8s_client.CoreV1Api().read_namespace_status(name)
-            if (ns.metadata.annotations and
-                (not wait_for_crd_annotation or
-                    ns.metadata.annotations.get(kuryr_crd_annotation))):
-                break
+        if not wait_for_crd:
+            return name, namespace_obj
+
+        if CONF.kuryr_kubernetes.kuryrnetworks:
+            # wait until kuryrnetwork CRD gets populated
+            while True:
+                time.sleep(1)
+                try:
+                    kns_crd = cls.get_kuryr_network_crds(name)
+                except kubernetes.client.rest.ApiException:
+                    continue
+                if (kns_crd.get('status') and
+                        kns_crd['status'].get('routerId')):
+                    break
+        else:
+            kuryr_crd_annotation = K8S_ANNOTATION_PREFIX + "-net-crd"
+            # wait until namespace gets created
+            while True:
+                time.sleep(1)
+                ns = cls.k8s_client.CoreV1Api().read_namespace_status(name)
+                if (ns.metadata.annotations and
+                        ns.metadata.annotations.get(kuryr_crd_annotation)):
+                    break
 
         return name, namespace_obj
 
@@ -586,6 +600,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def delete_namespace(cls, name, **kwargs):
         body = cls.k8s_client.V1DeleteOptions(**kwargs)
         cls.k8s_client.CoreV1Api().delete_namespace(name=name, body=body)
+
+    @classmethod
+    def get_namespace(cls, name):
+        cls.k8s_client.CoreV1Api().read_namespace(name=name)
 
     @classmethod
     def list_namespaces(cls, **kwargs):
@@ -611,6 +629,13 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return cls.k8s_client.CustomObjectsApi().get_cluster_custom_object(
             group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
             plural=KURYR_NET_CRD_PLURAL, name=name)
+
+    @classmethod
+    def get_kuryr_network_crds(cls, namespace):
+        return cls.k8s_client.CustomObjectsApi().get_namespaced_custom_object(
+            group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
+            namespace=namespace, plural=KURYR_NETWORK_CRD_PLURAL,
+            name=namespace)
 
     @classmethod
     def get_kuryr_netpolicy_crds(cls, name, namespace='default', **kwargs):

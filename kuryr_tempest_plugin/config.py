@@ -73,6 +73,8 @@ kuryr_k8s_opts = [
                 "cloud provider is set"),
     cfg.BoolOpt("validate_crd", default=False, help="Whether or not kuryr "
                 "CRDs should be validated"),
+    cfg.BoolOpt("kuryrnetworks", default=False, help="Whether or not "
+                "kuryrnetworks CRDs are used"),
     cfg.BoolOpt("configmap_modifiable", default=False, help="Whether config "
                 "map can be changed"),
     cfg.StrOpt("controller_label", default="name=kuryr-controller",
