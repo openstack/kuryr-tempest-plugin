@@ -18,3 +18,4 @@ POD_AFFINITY = {'requiredDuringSchedulingIgnoredDuringExecution': [
         {'operator': 'In', 'values': ['demo'], 'key': 'type'}]},
         'topologyKey': 'kubernetes.io/hostname'}]}
 TIME_TO_APPLY_SGS = 30
+POD_STATUS_RETRIES = 240

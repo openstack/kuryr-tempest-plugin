@@ -28,6 +28,7 @@ import kubernetes
 from kubernetes import client as k8s_client
 from kubernetes import config as k8s_config
 from kubernetes.stream import stream
+from kuryr_tempest_plugin.tests.scenario import consts
 
 from tempest import config
 from tempest.lib.common.utils import data_utils
@@ -168,11 +169,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         pod.spec.affinity = affinity
         cls.k8s_client.CoreV1Api().create_namespaced_pod(namespace=namespace,
                                                          body=pod)
-        status = ""
-        while status != "Running" and wait_for_status:
-            # TODO(dmellado) add timeout config to tempest plugin
-            time.sleep(1)
-            status = cls.get_pod_status(name, namespace)
+        if wait_for_status:
+            cls.wait_for_pod_status(
+                name,
+                namespace=namespace,
+                pod_status='Running',
+                retries=consts.POD_STATUS_RETRIES)
 
         return name, pod
 
