@@ -297,27 +297,34 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                       stderr=stderr)
         if container is not None:
             kwargs['container'] = container
-        # NOTE(yboaron): sometimes the 'connect_get_namespaced_pod_exec'
-        # and rest of functions from [1] that takes timeout as parameter are
-        # hanging from some reason (on OS select) although the command
-        # completed. To resolve that we set the '_request_timeout' for
-        # 'connect_get_namespaced_pod_exec' and f_timeout for the rest
-        # of functions.
-        # [1] https://github.com/kubernetes-client/python-base/blob/master/
-        # stream/ws_client.py
-        if req_timeout is not None:
-            kwargs['_request_timeout'] = req_timeout
-        if stderr:
-            kwargs['_preload_content'] = False
-            resp = stream(api.connect_get_namespaced_pod_exec, pod_name,
-                          namespace, **kwargs)
-            # Run until completion
-            resp.run_forever(timeout=f_timeout)
-            return (resp.read_stdout(timeout=f_timeout),
-                    resp.read_stderr(timeout=f_timeout))
-        else:
-            return stream(api.connect_get_namespaced_pod_exec, pod_name,
-                          namespace, **kwargs)
+
+        for attempt in range(1, 6):
+            try:
+                # NOTE(yboaron): sometimes the
+                # 'connect_get_namespaced_pod_exec'and rest of functions
+                # from [1] that takes timeout as parameter are hanging for some
+                # reason (on OS select) although the command completed. To
+                # resolve that we set the '_request_timeout' for
+                # 'connect_get_namespaced_pod_exec' and f_timeout for the rest
+                # of functions.
+                # [1] https://github.com/kubernetes-client/python-base/blob/
+                # master/stream/ws_client.py
+                if req_timeout is not None:
+                    kwargs['_request_timeout'] = req_timeout
+                if stderr:
+                    kwargs['_preload_content'] = False
+                    resp = stream(api.connect_get_namespaced_pod_exec,
+                                  pod_name, namespace, **kwargs)
+                    # Run until completion
+                    resp.run_forever(timeout=f_timeout)
+                    return (resp.read_stdout(timeout=f_timeout),
+                            resp.read_stderr(timeout=f_timeout))
+                else:
+                    return stream(api.connect_get_namespaced_pod_exec,
+                                  pod_name, namespace, **kwargs)
+            except kubernetes.client.rest.ApiException:
+                LOG.exception("Error received when contacting K8s API, "
+                              "attempt %d/5", attempt)
 
     def assign_fip_to_pod(self, pod_name, namespace="default"):
         ext_net_id = CONF.network.public_network_id
