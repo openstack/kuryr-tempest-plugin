@@ -28,6 +28,8 @@ from kuryr_tempest_plugin.tests.scenario import consts
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
+TIMEOUT_PERIOD = 120
+
 
 class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
@@ -66,20 +68,25 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         net_id = [n['network_id'] for n in seen_subnets['subnets']
                   if n['name'] == subnet_name]
 
-        kuryr_net_crd = self.get_kuryr_net_crds(kuryr_net_crd_name)
-
-        self.assertIn(kuryr_net_crd_name, kuryr_net_crd['metadata']['name'])
-        self.assertIn(kuryr_net_crd['spec']['subnetId'], subnet_id)
-        self.assertIn(kuryr_net_crd['spec']['netId'], net_id)
+        if CONF.kuryr_kubernetes.kuryrnetworks:
+            kuryr_net_crd = self.get_kuryr_network_crds(namespace_name)
+            self.assertIn(namespace_name,
+                          kuryr_net_crd['metadata']['name'])
+            self.assertIn(kuryr_net_crd['status']['subnetId'], subnet_id)
+            self.assertIn(kuryr_net_crd['status']['netId'], net_id)
+        else:
+            kuryr_net_crd = self.get_kuryr_net_crds(kuryr_net_crd_name)
+            self.assertIn(kuryr_net_crd_name,
+                          kuryr_net_crd['metadata']['name'])
+            self.assertIn(kuryr_net_crd['spec']['subnetId'], subnet_id)
+            self.assertIn(kuryr_net_crd['spec']['netId'], net_id)
 
         # Check namespace pod connectivity
         pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
                                         namespace=namespace_name)
         svc_name, _ = self.create_service(pod_label=pod.metadata.labels,
-                                          spec_type='LoadBalancer',
                                           namespace=namespace_name)
         svc_service_ip = self.get_service_ip(service_name=svc_name,
-                                             spec_type='LoadBalancer',
                                              namespace=namespace_name)
         self.wait_service_status(svc_service_ip,
                                  CONF.kuryr_kubernetes.lb_build_timeout)
@@ -270,10 +277,22 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         # Check resources are deleted
         self.delete_namespace(namespace)
 
-        while True:
+        start = time.time()
+        while time.time() - start < TIMEOUT_PERIOD:
             time.sleep(1)
             try:
-                self.get_kuryr_net_crds(net_crd['metadata']['name'])
+                if CONF.kuryr_kubernetes.kuryrnetworks:
+                    self.get_kuryr_network_crds(namespace)
+                else:
+                    self.get_kuryr_net_crds(net_crd['metadata']['name'])
+            except kubernetes.client.rest.ApiException:
+                break
+
+        # Also wait for the namespace removal
+        while time.time() - start < TIMEOUT_PERIOD:
+            time.sleep(1)
+            try:
+                self.get_namespace(namespace)
             except kubernetes.client.rest.ApiException:
                 break
 
@@ -285,16 +304,14 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_subnet_names = [n['name'] for n in seen_subnets['subnets']]
         self.assertNotIn(subnet, seen_subnet_names)
 
-        seen_sgs = self.list_security_groups()
-        seen_sg_ids = [sg['id'] for sg in seen_sgs]
-        if net_crd['spec'].get('sgId', None):
-            self.assertNotIn(net_crd['spec']['sgId'], seen_sg_ids)
-
     @decorators.idempotent_id('90b7cb81-f80e-4ff3-9892-9e5fdcd08289')
     def test_create_kuryrnet_crd_without_net_id(self):
         if not CONF.kuryr_kubernetes.validate_crd:
             raise self.skipException('CRD validation must be enabled to run '
                                      'this test.')
+        if CONF.kuryr_kubernetes.kuryrnetworks:
+            raise self.skipException('Kuryrnetworks CRD should not be used '
+                                     'to run this test.')
         kuryrnet = dict(self._get_kuryrnet_obj())
         del kuryrnet['spec']['netId']
         error_msg = 'spec.netId in body is required'
@@ -306,6 +323,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         if not CONF.kuryr_kubernetes.validate_crd:
             raise self.skipException('CRD validation must be enabled to run '
                                      'this test.')
+        if CONF.kuryr_kubernetes.kuryrnetworks:
+            raise self.skipException('Kuryrnetworks CRD should not be used '
+                                     'to run this test.')
         kuryrnet = dict(self._get_kuryrnet_obj())
         kuryrnet['spec']['populated'] = 'False'
         error_msg = 'spec.populated in body must be of type boolean'
@@ -331,6 +351,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         }
 
     def _create_kuryr_net_crd_obj(self, crd_manifest, error_msg, field):
+        if CONF.kuryr_kubernetes.kuryrnetworks:
+            raise self.skipException('Kuryrnetworks CRD should not be used '
+                                     'to run this test.')
         version = 'v1'
         group = 'openstack.org'
         plural = 'kuryrnets'
@@ -362,7 +385,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         ns_name = data_utils.rand_name(prefix='kuryr-ns')
 
         ns_name, ns = self.create_namespace(
-            name=ns_name, wait_for_crd_annotation=False)
+            name=ns_name, wait_for_crd=False)
+        # Allow controller manager to create a token for the service account
+        time.sleep(1)
         self.addCleanup(self.delete_namespace, ns_name)
         pod_name, pod = self.create_pod(
             namespace=ns_name, wait_for_status=False)
@@ -372,18 +397,20 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         retries = 120
         while True:
             try:
+                time.sleep(1)
                 self.k8s_client.CoreV1Api().read_namespace(ns_name)
                 retries -= 1
                 self.assertNotEqual(0, retries,
                                     "Timed out waiting for namespace %s to"
                                     " be deleted" % ns_name)
-                time.sleep(1)
             except kubernetes.client.rest.ApiException as e:
                 if e.status == 404:
                     break
 
         ns_name, ns = self.create_namespace(
-            name=ns_name, wait_for_crd_annotation=False)
+            name=ns_name, wait_for_crd=False)
+        # Allow controller manager to create a token for the service account
+        time.sleep(1)
         pod_name, pod = self.create_pod(
             namespace=ns_name, wait_for_status=False)
 

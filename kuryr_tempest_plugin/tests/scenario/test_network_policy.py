@@ -328,6 +328,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
     @decorators.idempotent_id('24577a9b-1d46-419b-8b60-da3c49d777c3')
     def test_create_delete_network_policy_non_default_ns(self):
         ns_name, ns = self.create_namespace()
+        self.addCleanup(self.delete_namespace, ns_name)
         match_labels = {'role': 'db'}
         np = self.create_network_policy(match_labels=match_labels,
                                         namespace=ns_name)
