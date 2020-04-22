@@ -14,7 +14,6 @@
 
 import json
 import kubernetes
-import requests
 import time
 
 from oslo_log import log as logging
@@ -49,6 +48,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
     def test_namespace(self):
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
+        self.namespaces.append(namespace)
 
         existing_namespaces = [ns.metadata.name
                                for ns in self.list_namespaces().items]
@@ -84,15 +84,10 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         # Check namespace pod connectivity
         pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
                                         namespace=namespace_name)
-        svc_name, _ = self.create_service(pod_label=pod.metadata.labels,
-                                          namespace=namespace_name)
-        svc_service_ip = self.get_service_ip(service_name=svc_name,
-                                             namespace=namespace_name)
-        self.wait_service_status(svc_service_ip,
-                                 CONF.kuryr_kubernetes.lb_build_timeout)
-
-        requests.get("http://{dst_ip}".format(dst_ip=svc_service_ip))
-
+        self.create_setup_for_service_test(namespace=namespace_name,
+                                           cleanup=False)
+        self.check_service_internal_connectivity(namespace=namespace_name,
+                                                 cleanup=False)
         # Check resources are deleted
         self._delete_namespace_resources(namespace_name, kuryr_net_crd,
                                          subnet_name)

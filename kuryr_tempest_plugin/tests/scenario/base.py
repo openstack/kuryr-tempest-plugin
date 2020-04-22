@@ -71,6 +71,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def resource_setup(cls):
         super(BaseKuryrScenarioTest, cls).resource_setup()
         cls.pod_fips = []
+        cls.namespaces = []
         # TODO(dmellado): Config k8s client in a cleaner way
         k8s_config.load_kube_config()
 
@@ -80,6 +81,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         for fip in cls.pod_fips:
             cls.os_admin.floating_ips_client.delete_floatingip(
                 fip['floatingip']['id'])
+        for namespace in cls.namespaces:
+            cls.delete_namespace(namespace)
 
     @classmethod
     def create_network_policy(cls, name=None, namespace='default',
@@ -551,8 +554,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         for i in range(pod_num):
             pod_name, pod = cls.create_pod(
                 labels={"app": label}, namespace=namespace)
-            cls.addClassResourceCleanup(cls.delete_pod, pod_name,
-                                        namespace=namespace)
+            if cleanup:
+                cls.addClassResourceCleanup(cls.delete_pod, pod_name,
+                                            namespace=namespace)
         cls.pod_num = pod_num
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type,
@@ -608,7 +612,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def delete_namespace(cls, name, **kwargs):
         body = cls.k8s_client.V1DeleteOptions(**kwargs)
-        cls.k8s_client.CoreV1Api().delete_namespace(name=name, body=body)
+        try:
+            cls.k8s_client.CoreV1Api().delete_namespace(name=name, body=body)
+        except kubernetes.client.rest.ApiException as e:
+            if e.status == 404:
+                return
+            raise
 
     @classmethod
     def get_namespace(cls, name):
@@ -1070,17 +1079,23 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return pod_name_list
 
     def check_service_internal_connectivity(self, service_port='80',
-                                            protocol='TCP'):
+                                            protocol='TCP',
+                                            namespace='default',
+                                            cleanup=True):
         # FIXME(itzikb): Use the clusterIP to
         # check service status as there are some issues with the FIPs
         # and OVN gates
         clusterip_svc_ip = self.get_service_ip(self.service_name,
-                                               spec_type='ClusterIP')
-        pod_name, pod = self.create_pod()
-        self.addClassResourceCleanup(self.delete_pod, pod_name)
+                                               spec_type='ClusterIP',
+                                               namespace=namespace)
+        pod_name, pod = self.create_pod(namespace=namespace)
+        if cleanup:
+            self.addClassResourceCleanup(self.delete_pod, pod_name,
+                                         namespace=namespace)
         self.assert_backend_amount_from_pod(
             clusterip_svc_ip,
             self.pod_num,
             pod_name,
             service_port,
-            protocol)
+            protocol,
+            namespace_name=namespace)
