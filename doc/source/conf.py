@@ -45,7 +45,6 @@ copyright = u'2017, OpenStack Foundation'
 repository_name = 'openstack/kuryr-tempest-plugin'
 bug_project = 'kuryr-kubernetes'
 bug_tag = ''
-html_last_updated_fmt = '%Y-%m-%d %H:%M'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = True

@@ -778,7 +778,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 unique_resps = set(resp for resp in responses if resp)
             else:
                 unique_resps = set(resp for resp in responses if resp
-                                   is not '')
+                                   != '')
             tester.assertEqual(amount, len(unique_resps),
                                'Incorrect amount of unique backends. '
                                'Got {}'.format(unique_resps))
@@ -1029,19 +1029,19 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         # Check that new kuryr-controller is up and running
         for kuryr_pod_name in self.get_controller_pod_names():
-                self.wait_for_pod_status(
-                    kuryr_pod_name,
-                    namespace=system_namespace,
-                    pod_status='Running',
-                    retries=120)
+            self.wait_for_pod_status(
+                kuryr_pod_name,
+                namespace=system_namespace,
+                pod_status='Running',
+                retries=120)
 
-                # Wait until kuryr-controller pools are reloaded, i.e.,
-                # kuryr-controller is ready
-                res = test_utils.call_until_true(
-                    self.get_pod_readiness, 30, 1, kuryr_pod_name,
-                    namespace=system_namespace, container_name='controller')
-                self.assertTrue(res, 'Timed out waiting for '
-                                     'kuryr-controller to reload pools.')
+            # Wait until kuryr-controller pools are reloaded, i.e.,
+            # kuryr-controller is ready
+            res = test_utils.call_until_true(
+                self.get_pod_readiness, 30, 1, kuryr_pod_name,
+                namespace=system_namespace, container_name='controller')
+            self.assertTrue(res, 'Timed out waiting for '
+                                 'kuryr-controller to reload pools.')
 
     def update_config_map_ini_section_and_restart(
             self, name, conf_to_update, section,
