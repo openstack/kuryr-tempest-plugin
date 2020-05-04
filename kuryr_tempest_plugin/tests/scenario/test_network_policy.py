@@ -440,7 +440,6 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
                 'egressSgRules': [{'security_group_rule': sg_rule}],
                 'ingressSgRules': [],
                 'networkpolicy_spec': {
-                    'podSelector': {},
                     'policyTypes': ['Ingress'],
                     'podSelector': {}},
                 'podSelector': {},

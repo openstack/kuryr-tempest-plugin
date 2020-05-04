@@ -27,9 +27,9 @@ class TestKuryrDaemon(base.BaseKuryrScenarioTest):
         super(TestKuryrDaemon, cls).skip_checks()
         if (not CONF.kuryr_kubernetes.containerized) or (
            not CONF.kuryr_kubernetes.kuryr_daemon_enabled):
-                raise cls.skipException("Kuryr cni should be containerized "
-                                        "and Kuryr Daemon should be enabled "
-                                        "to run this test.")
+            raise cls.skipException("Kuryr cni should be containerized "
+                                    "and Kuryr Daemon should be enabled "
+                                    "to run this test.")
 
     @decorators.idempotent_id('bddf5441-1244-a49d-a125-b5fd3fb111a7')
     def test_kuryr_cni_daemon(self):
