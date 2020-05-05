@@ -142,8 +142,6 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # than two it means that once we create another pod ports_pool_patch
         # number of ports will be created, If the difference is more than two
         # no new ports will be created once we create a new pod
-        updated3_port_list_num = len(self.os_admin.ports_client.list_ports(
-            fixed_ips='subnet_id=%s' % subnet_id)['ports'])
         ports_pool_batch = int(self.PORTS_POOL_DEFAULT_DICT[
                                'ports_pool_batch'])
         ports_pool_min = int(self.PORTS_POOL_DEFAULT_DICT['ports_pool_min'])
@@ -153,6 +151,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             num_ports_expected = ports_pool_batch * 2 + 1
         else:
             num_ports_expected = ports_pool_batch + 1
+
+        updated3_port_list_num = self.check_ports_num_increase(
+            num_ports_expected, subnet_id)
         self.assertEqual(num_ports_expected, updated3_port_list_num)
 
         # check connectivity between pods
