@@ -18,3 +18,29 @@
       - publish-openstack-docs-pti
       - tempest-plugin-jobs
       - kuryr-kubernetes-tempest-jobs
+    check:
+      jobs:
+        - kuryr-kubernetes-tempest-ussuri
+        - kuryr-kubernetes-tempest-train
+        - kuryr-kubernetes-tempest-stein
+
+- job:
+    name: kuryr-kubernetes-tempest-ussuri
+    parent: kuryr-kubernetes-tempest
+    override-checkout: stable/ussuri
+
+- job:
+    name: kuryr-kubernetes-tempest-train
+    parent: kuryr-kubernetes-tempest
+    override-checkout: stable/train
+    vars:
+      devstack_localrc:
+        USE_PYTHON3: True
+
+- job:
+    name: kuryr-kubernetes-tempest-stein
+    parent: kuryr-kubernetes-tempest
+    override-checkout: stable/stein
+    vars:
+      devstack_localrc:
+        USE_PYTHON3: True
