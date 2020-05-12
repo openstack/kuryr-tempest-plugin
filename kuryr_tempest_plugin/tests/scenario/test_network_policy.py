@@ -16,6 +16,7 @@ import json
 import kubernetes
 import time
 
+import netaddr
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
@@ -84,7 +85,17 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
     def test_ipblock_network_policy_allow_except(self):
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        allow_all_cidr = '0.0.0.0/0'
+        cidr = self.get_kuryr_network_crds(
+            namespace_name)['status']['subnetCIDR']
+
+        ipn = netaddr.IPNetwork(cidr)
+        max_prefixlen = "/32"
+        curl_tmpl = "curl {}{}"
+        if ipn.version == 6:
+            max_prefixlen = "/128"
+            curl_tmpl = "curl [{}]{}"
+
+        allow_all_cidr = cidr
         pod_ip_list = []
         pod_name_list = []
         cmd_list = []
@@ -96,8 +107,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             pod_name_list.append(pod_name)
             pod_ip = self.get_pod_ip(pod_name, namespace=namespace_name)
             pod_ip_list.append(pod_ip)
-            cmd = ["/bin/sh", "-c", "curl {dst_ip}:8080".format(
-                dst_ip=pod_ip_list[i])]
+            cmd = ["/bin/sh", "-c", curl_tmpl.format(pod_ip_list[i], ':8080')]
             cmd_list.append(cmd)
 
         # Check connectivity from pod4 to other pods before creating NP
@@ -112,9 +122,9 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         # and second pod on egress
         np = self.create_network_policy(
             namespace=namespace_name, ingress_ipblock_cidr=allow_all_cidr,
-            ingress_ipblock_except=[pod_ip_list[0]+'/32'],
+            ingress_ipblock_except=[pod_ip_list[0] + max_prefixlen],
             egress_ipblock_cidr=allow_all_cidr,
-            egress_ipblock_except=[pod_ip_list[1]+'/32'])
+            egress_ipblock_except=[pod_ip_list[1] + max_prefixlen])
 
         LOG.debug("Creating network policy %s", np)
         network_policy_name = np.metadata.name
