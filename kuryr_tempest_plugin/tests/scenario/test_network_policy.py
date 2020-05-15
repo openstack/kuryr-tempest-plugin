@@ -128,17 +128,22 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
 
         LOG.debug("Creating network policy %s", np)
         network_policy_name = np.metadata.name
-        kuryr_netpolicy_crd_name = 'np-' + network_policy_name
+        netpolicy_crd_name = 'np-' + network_policy_name
 
+        knp = None
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                self.get_kuryr_netpolicy_crds(
-                    name=kuryr_netpolicy_crd_name, namespace=namespace_name)
+                knp = self.get_kuryr_netpolicy_crds(
+                    name=netpolicy_crd_name, namespace=namespace_name)
                 break
             except kubernetes.client.rest.ApiException:
                 time.sleep(1)
                 continue
+        if not knp:
+            msg = ('Timed out waiting for knp %s creation' %
+                   netpolicy_crd_name)
+            raise lib_exc.TimeoutException(msg)
 
         # Wait for network policy to be created
         time.sleep(consts.TIME_TO_APPLY_SGS)
@@ -164,7 +169,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
 
         # Delete network policy and check that there is still http connection
         # between pods
-        np_exist = True
+        knp_exist = True
         self.delete_network_policy(np.metadata.name, namespace_name)
 
         start = time.time()
@@ -172,14 +177,17 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             try:
                 time.sleep(1)
                 self.get_kuryr_netpolicy_crds(
-                    name=kuryr_netpolicy_crd_name, namespace=namespace_name)
+                    name=netpolicy_crd_name, namespace=namespace_name)
             except kubernetes.client.rest.ApiException as e:
                 if e.status == 404:
-                    np_exist = False
+                    knp_exist = False
                     break
                 else:
                     continue
-        self.assertFalse(np_exist)
+        if knp_exist:
+            msg = ('Timed out waiting for knp %s deletion' %
+                   netpolicy_crd_name)
+            raise lib_exc.TimeoutException(msg)
 
         for i in range(3):
             self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
