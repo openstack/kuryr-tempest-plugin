@@ -575,7 +575,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                         namespace=namespace)
 
     @classmethod
-    def create_namespace(cls, name=None, wait_for_crd=True):
+    def create_namespace(cls, name=None, wait_for_crd=True,
+                         timeout_period=consts.NS_TIMEOUT):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-namespace')
         namespace = cls.k8s_client.V1Namespace()
@@ -586,10 +587,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         if not wait_for_crd:
             return name, namespace_obj
 
+        start = time.time()
         if CONF.kuryr_kubernetes.kuryrnetworks:
             # wait until kuryrnetwork CRD gets populated
-            while True:
-                time.sleep(1)
+            while time.time() - start < timeout_period:
+                time.sleep(5)
                 try:
                     kns_crd = cls.get_kuryr_network_crds(name)
                 except kubernetes.client.rest.ApiException:
@@ -597,6 +599,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 if (kns_crd.get('status') and
                         kns_crd['status'].get('routerId')):
                     break
+            if (not kns_crd.get('status')) or (
+                    not kns_crd.get('status').get('routerId')):
+                msg = 'Timed out waiting for kns crd %s creation' % name
+                raise lib_exc.TimeoutException(msg)
         else:
             kuryr_crd_annotation = K8S_ANNOTATION_PREFIX + "-net-crd"
             # wait until namespace gets created
@@ -817,11 +823,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def _verify_endpoints_annotation(cls, ep_name, ann_string,
                                      poll_interval=1, namespace='default',
-                                     pod_num=None):
+                                     pod_num=None,
+                                     timeout_period=consts.LB_TIMEOUT):
         LOG.info("Look for %s string in ep=%s annotation ",
                  ann_string, ep_name)
+
+        start = time.time()
+        annotation_success = False
         # wait until endpoint annotation created
-        while True:
+        while time.time() - start < timeout_period:
             time.sleep(poll_interval)
             ep = cls.k8s_client.CoreV1Api().read_namespaced_endpoints(
                 ep_name, namespace)
@@ -846,11 +856,16 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                         continue
                 LOG.info("Found %s string in ep=%s annotation ",
                          ann_string, ep_name)
-                return
+                annotation_success = True
+                break
             except KeyError:
                 LOG.info("Waiting till %s will appear "
                          "in ep=%s annotation ", ann_string, ep_name)
                 continue
+        if not annotation_success:
+            msg = "Timed out waiting for %s in ep=%s annotation to appear" % (
+                    ann_string, ep_name)
+            raise lib_exc.TimeoutException(msg)
 
     def create_vm_for_connectivity_test(self):
         keypair = self.create_keypair()
