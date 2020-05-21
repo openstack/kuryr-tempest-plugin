@@ -848,7 +848,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                          ann_string, ep_name)
                 return
             except KeyError:
-                LOG.info("Waiting till %s will appears "
+                LOG.info("Waiting till %s will appear "
                          "in ep=%s annotation ", ann_string, ep_name)
                 continue
 
