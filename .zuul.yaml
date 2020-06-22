@@ -33,6 +33,9 @@
     name: kuryr-kubernetes-tempest-train
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/train
+    required-projects:
+    - name: openstack/diskimage-builder
+      override-checkout: 2.30.0
     vars:
       devstack_localrc:
         USE_PYTHON3: True
@@ -41,6 +44,9 @@
     name: kuryr-kubernetes-tempest-stein
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/stein
+    required-projects:
+    - name: openstack/diskimage-builder
+      override-checkout: 2.30.0
     vars:
       devstack_localrc:
         USE_PYTHON3: True
