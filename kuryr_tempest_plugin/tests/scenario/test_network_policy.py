@@ -85,8 +85,13 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
     def test_ipblock_network_policy_allow_except(self):
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        cidr = self.get_kuryr_network_crds(
-            namespace_name)['status']['subnetCIDR']
+        if CONF.kuryr_kubernetes.kuryrnetworks:
+            cidr = self.get_kuryr_network_crds(
+                namespace_name)['status']['subnetCIDR']
+        else:
+            crd_name = 'ns-' + namespace_name
+            cidr = self.get_kuryr_net_crds(
+                crd_name)['spec']['subnetCIDR']
 
         ipn = netaddr.IPNetwork(cidr)
         max_prefixlen = "/32"
