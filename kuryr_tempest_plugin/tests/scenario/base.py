@@ -43,6 +43,7 @@ KURYR_CRD_GROUP = 'openstack.org'
 KURYR_CRD_VERSION = 'v1'
 KURYR_NET_CRD_PLURAL = 'kuryrnets'
 KURYR_NETWORK_CRD_PLURAL = 'kuryrnetworks'
+KURYR_PORT_CRD_PLURAL = 'kuryrports'
 KURYR_NET_POLICY_CRD_PLURAL = 'kuryrnetpolicies'
 K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
@@ -272,19 +273,36 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                        container_name=container_name)
 
     def get_pod_port(self, pod_name, namespace="default"):
-        pod = self.k8s_client.CoreV1Api().read_namespaced_pod_status(
-            namespace=namespace, name=pod_name)
-        kuryr_if = json.loads(pod.metadata.annotations[
-            'openstack.org/kuryr-vif'])
+        try:
+            # TODO(gryf): Current approach is to look at the KuryrPort CRD,
+            # and if it doesn't exists, fallback to check the pod annotations
+            crd = (self.k8s_client.CustomObjectsApi()
+                   .get_namespaced_custom_object(group=KURYR_CRD_GROUP,
+                                                 version=KURYR_CRD_VERSION,
+                                                 namespace=namespace,
+                                                 plural=KURYR_PORT_CRD_PLURAL,
+                                                 name=pod_name))
+            vif = [v['vif'].get('versioned_object.data', {}).get('id')
+                   for k, v in crd['spec']['vifs'].items() if v.get('default')]
+            if vif and vif[0]:
+                return vif[0]
+            else:
+                return None
+        except kubernetes.client.rest.ApiException:
+            pod = self.k8s_client.CoreV1Api().read_namespaced_pod_status(
+                namespace=namespace, name=pod_name)
+            kuryr_if = json.loads(pod.metadata.annotations[
+                'openstack.org/kuryr-vif'])
 
-        # FIXME(dulek): We need this compatibility code to run stable/queens.
-        #               Remove this once it's no longer supported.
-        if 'eth0' in kuryr_if:
-            kuryr_if = kuryr_if['eth0']
-        elif kuryr_if.get('versioned_object.name') == 'PodState':
-            kuryr_if = kuryr_if['versioned_object.data']['default_vif']
+            # FIXME(dulek): We need this compatibility code to run
+            #               stable/queens. Remove this once it's no longer
+            #               supported.
+            if 'eth0' in kuryr_if:
+                kuryr_if = kuryr_if['eth0']
+            elif kuryr_if.get('versioned_object.name') == 'PodState':
+                kuryr_if = kuryr_if['versioned_object.data']['default_vif']
 
-        return kuryr_if['versioned_object.data']['id']
+            return kuryr_if['versioned_object.data']['id']
 
     @classmethod
     def get_pod_node_name(cls, pod_name, namespace="default"):
