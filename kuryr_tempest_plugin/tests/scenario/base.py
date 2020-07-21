@@ -44,7 +44,6 @@ KURYR_CRD_VERSION = 'v1'
 KURYR_NET_CRD_PLURAL = 'kuryrnets'
 KURYR_NETWORK_CRD_PLURAL = 'kuryrnetworks'
 KURYR_PORT_CRD_PLURAL = 'kuryrports'
-KURYR_NET_POLICY_CRD_PLURAL = 'kuryrnetpolicies'
 K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
 K8S_ANNOTATION_LBAAS_RT_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-route-state'
@@ -678,13 +677,6 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
             namespace=namespace, plural=KURYR_NETWORK_CRD_PLURAL,
             name=namespace)
-
-    @classmethod
-    def get_kuryr_netpolicy_crds(cls, name, namespace='default', **kwargs):
-        return cls.k8s_client.CustomObjectsApi().get_namespaced_custom_object(
-            group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
-            namespace=namespace, plural=KURYR_NET_POLICY_CRD_PLURAL,
-            name=name, **kwargs)
 
     def get_pod_list(self, namespace='default', label_selector=''):
         return self.k8s_client.CoreV1Api().list_namespaced_pod(

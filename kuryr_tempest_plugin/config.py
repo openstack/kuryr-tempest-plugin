@@ -75,6 +75,9 @@ kuryr_k8s_opts = [
                 "CRDs should be validated"),
     cfg.BoolOpt("kuryrnetworks", default=False, help="Whether or not "
                 "kuryrnetworks CRDs are used"),
+    cfg.BoolOpt("new_kuryrnetworkpolicy_crd", default=False,
+                help="Whether or not KuryrNetworkPolicy CRDs are used instead "
+                     "of KuryrNetPolicy"),
     cfg.BoolOpt("configmap_modifiable", default=False, help="Whether config "
                 "map can be changed"),
     cfg.StrOpt("controller_label", default="name=kuryr-controller",
