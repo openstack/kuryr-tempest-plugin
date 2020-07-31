@@ -282,8 +282,16 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                                  namespace=namespace,
                                                  plural=KURYR_PORT_CRD_PLURAL,
                                                  name=pod_name))
-            vif = [v['vif'].get('versioned_object.data', {}).get('id')
-                   for k, v in crd['spec']['vifs'].items() if v.get('default')]
+            try:
+                vif = [v['vif'].get('versioned_object.data', {}).get('id')
+                       for k, v in crd['status']['vifs'].items()
+                       if v.get('default')]
+            except KeyError:
+                # TODO(gryf): Remove this after moving vifs to status succeed.
+                vif = [v['vif'].get('versioned_object.data', {}).get('id')
+                       for k, v in crd['spec']['vifs'].items()
+                       if v.get('default')]
+
             if vif and vif[0]:
                 return vif[0]
             else:
