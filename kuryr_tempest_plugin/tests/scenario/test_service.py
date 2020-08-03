@@ -101,7 +101,6 @@ class TestUdpServiceScenario(base.BaseKuryrScenarioTest):
         if not CONF.kuryr_kubernetes.test_udp_services:
             raise cls.skipException("Service UDP tests are not enabled")
 
-    @decorators.skip_because(bug="1886909")
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fda1670781')
     def test_service_udp_ping(self):
         # NOTE(ltomasbo): Using LoadBalancer type to avoid namespace isolation
