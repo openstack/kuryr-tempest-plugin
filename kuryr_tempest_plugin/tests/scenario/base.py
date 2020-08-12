@@ -739,9 +739,13 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             namespace=namespace, label_selector=label_selector)]
 
     def get_controller_pod_names(self):
-        return self.get_pod_name_list(
+        controller_label = CONF.kuryr_kubernetes.controller_label
+        controller_pod_names = self.get_pod_name_list(
             namespace=CONF.kuryr_kubernetes.kube_system_namespace,
-            label_selector=CONF.kuryr_kubernetes.controller_label)
+            label_selector=controller_label)
+        self.assertNotEmpty(controller_pod_names, "Can't find controller pods "
+                            "with label %s" % controller_label)
+        return controller_pod_names
 
     def _run_and_assert_fn(self, fn, repeats=10, responses_num=2):
         cmd_outputs = set()
