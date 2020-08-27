@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import testtools
+
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
@@ -83,6 +85,9 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
         self._run_and_assert_fn(curl)
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdbfc1b2a7')
+    @testtools.skipUnless(
+        CONF.kuryr_kubernetes.containerized,
+        "test_unsupported_service_type only runs on containerized setups")
     def test_unsupported_service_type(self):
         # Testing that kuryr controller didn't crash for 100 seconds since
         # creation of service with unsupported type
