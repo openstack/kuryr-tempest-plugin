@@ -93,7 +93,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                               ingress_ipblock_except=[],
                               egress_port=None, egress_port_protocol='TCP',
                               egress_ipblock_cidr=None,
-                              egress_ipblock_except=[]):
+                              egress_ipblock_except=[],
+                              ingress_match_expressions=None,
+                              egress_match_expressions=None):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-network-policy')
         np = k8s_client.V1NetworkPolicy()
@@ -101,15 +103,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         np.api_version = 'networking.k8s.io/v1'
         np.metadata = k8s_client.V1ObjectMeta(name=name,
                                               namespace=namespace)
-        to, _from = None, None
+        to, _from = [], []
         if egress_ipblock_cidr:
-            to = [k8s_client.V1NetworkPolicyPeer(
+            to.append(k8s_client.V1NetworkPolicyPeer(
                 ip_block=k8s_client.V1IPBlock(cidr=egress_ipblock_cidr,
-                                              _except=egress_ipblock_except))]
+                                              _except=egress_ipblock_except)))
         if ingress_ipblock_cidr:
-            _from = [k8s_client.V1NetworkPolicyPeer(
+            _from.append(k8s_client.V1NetworkPolicyPeer(
                 ip_block=k8s_client.V1IPBlock(cidr=ingress_ipblock_cidr,
-                                              _except=ingress_ipblock_except))]
+                                              _except=ingress_ipblock_except)))
         if ingress_port:
             ingress_port = [k8s_client.V1NetworkPolicyPort(
                 port=ingress_port, protocol=ingress_port_protocol)]
@@ -117,6 +119,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             egress_port = [k8s_client.V1NetworkPolicyPort(
                 port=egress_port, protocol=egress_port_protocol)]
 
+        if ingress_match_expressions:
+            _from.append(k8s_client.V1NetworkPolicyPeer(
+                pod_selector=k8s_client.V1LabelSelector(
+                    match_expressions=ingress_match_expressions)))
+        if egress_match_expressions:
+            to.append(k8s_client.V1NetworkPolicyPeer(
+                pod_selector=k8s_client.V1LabelSelector(
+                    match_expressions=egress_match_expressions)))
         np.spec = k8s_client.V1NetworkPolicySpec(
             egress=[k8s_client.V1NetworkPolicyEgressRule(
                 ports=egress_port,
@@ -746,6 +756,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return [pod.metadata.name for pod in self.get_pod_list(
             namespace=namespace, label_selector=label_selector)]
 
+    def get_pod_ip_list(self, namespace='default', label_selector=''):
+        return [pod.status.pod_ip for pod in self.get_pod_list(
+            namespace=namespace, label_selector=label_selector)]
+
     def get_controller_pod_names(self):
         controller_label = CONF.kuryr_kubernetes.controller_label
         controller_pod_names = self.get_pod_name_list(
@@ -1200,21 +1214,43 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def check_service_internal_connectivity(self, service_port='80',
                                             protocol='TCP',
                                             namespace='default',
+                                            labels=None,
+                                            pod_num=None,
+                                            pod_name=None,
                                             cleanup=True):
+        """Verify client pod to service connectivity
+
+        Create a pod unless a value for the pod_name parameter is provided and
+        check connectivity to a service from that pod.
+
+        :param service_port - The port of the service we check
+        :param protocol - The service protocol we check
+        :namespace - The namespace of the client pod
+        :param labels - The labels of the client pod
+        :param pod_num - The number of pods expected to serve the service
+        :param pod_name - If supplied no pod will be created and instead a pod
+                          with this name will be used
+        :param cleanup - Whether to add a cleanup function for the created pod
+        :returns: The name of the client pod that was created or passed to
+                  the function
+        """
         # FIXME(itzikb): Use the clusterIP to
         # check service status as there are some issues with the FIPs
         # and OVN gates
         clusterip_svc_ip = self.get_service_ip(self.service_name,
                                                spec_type='ClusterIP',
                                                namespace=namespace)
-        pod_name, pod = self.create_pod(namespace=namespace)
-        if cleanup:
-            self.addClassResourceCleanup(self.delete_pod, pod_name,
-                                         namespace=namespace)
+        pod_num = pod_num or self.pod_num
+        if not pod_name:
+            pod_name, _ = self.create_pod(namespace=namespace, labels=labels)
+            if cleanup:
+                self.addClassResourceCleanup(self.delete_pod, pod_name,
+                                             namespace=namespace)
         self.assert_backend_amount_from_pod(
             clusterip_svc_ip,
-            self.pod_num,
+            pod_num,
             pod_name,
             service_port,
             protocol,
             namespace_name=namespace)
+        return pod_name

@@ -27,7 +27,7 @@ from kuryr_tempest_plugin.tests.scenario import consts
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
-TIMEOUT_PERIOD = 120
+TIMEOUT_PERIOD = 180
 
 
 class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
@@ -38,6 +38,59 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         if not CONF.kuryr_kubernetes.network_policy_enabled:
             raise cls.skipException('Network Policy driver and handler must '
                                     'be enabled to run this tests')
+
+    def get_sg_rules_for_np(self, namespace, network_policy_name):
+        start = time.time()
+        while time.time() - start < TIMEOUT_PERIOD:
+            try:
+                time.sleep(1)
+                sg_id, _ = self.get_np_crd_info(name=network_policy_name,
+                                                namespace=namespace)
+                if sg_id:
+                    break
+            except kubernetes.client.rest.ApiException:
+                continue
+        self.assertIsNotNone(sg_id)
+        return self.list_security_group_rules(sg_id)
+
+    def check_sg_rules_for_np(self, namespace, np,
+                              ingress_cidrs_should_exist=(),
+                              egress_cidrs_should_exist=(),
+                              ingress_cidrs_shouldnt_exist=(),
+                              egress_cidrs_shouldnt_exist=()):
+        ingress_cidrs_found = set()
+        egress_cidrs_found = set()
+        ingress_cidrs_should_exist = set(ingress_cidrs_should_exist)
+        egress_cidrs_should_exist = set(egress_cidrs_should_exist)
+        ingress_cidrs_shouldnt_exist = set(ingress_cidrs_shouldnt_exist)
+        egress_cidrs_shouldnt_exist = set(egress_cidrs_shouldnt_exist)
+
+        rules_match = False
+        start = time.time()
+
+        while ((not rules_match) and (time.time() - start < TIMEOUT_PERIOD)):
+            sg_rules = self.get_sg_rules_for_np(namespace, np)
+
+            for rule in sg_rules:
+                if rule['direction'] == 'ingress':
+                    ingress_cidrs_found.add(rule['remote_ip_prefix'])
+                elif rule['direction'] == 'egress':
+                    egress_cidrs_found.add(rule['remote_ip_prefix'])
+
+                if (ingress_cidrs_should_exist.issubset(ingress_cidrs_found)
+                    and (not ingress_cidrs_shouldnt_exist
+                         or not ingress_cidrs_shouldnt_exist.issubset(
+                             ingress_cidrs_found))
+                    and egress_cidrs_should_exist.issubset(egress_cidrs_found)
+                    and (not egress_cidrs_shouldnt_exist
+                         or not egress_cidrs_shouldnt_exist.issubset(
+                            egress_cidrs_found))):
+                    rules_match = True
+                else:
+                    time.sleep(10)
+        if not rules_match:
+            msg = 'Timed out waiting sg rules for np %s to match' % np
+            raise lib_exc.TimeoutException(msg)
 
     @decorators.idempotent_id('a9db5bc5-e921-4719-8201-5431537c86f8')
     @decorators.unstable_test(bug="1860554")
@@ -374,3 +427,136 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             time.sleep(1)
         if time.time() - start >= TIMEOUT_PERIOD:
             raise lib_exc.TimeoutException('Sec group ID still exists')
+
+    @decorators.idempotent_id('a93b5bc5-e931-4719-8201-54315c5c86f8')
+    def test_network_policy_add_remove_pod(self):
+        np_name_server = 'allow-all-server'
+        np_name_client = 'allow-all-client'
+        server_label = {'app': 'server'}
+        client_label = {'app': 'client'}
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+
+        self.create_setup_for_service_test(label='server',
+                                           namespace=namespace_name,
+                                           cleanup=False)
+        LOG.debug("A service %s and two pods were created in namespace %s",
+                  self.service_name, namespace_name)
+        service_pods = self.get_pod_list(namespace=namespace_name,
+                                         label_selector='app=server')
+        service_pods_cidrs = [pod.status.pod_ip+'/32' for pod in service_pods]
+        (first_server_pod_cidr, first_server_pod_name) = (
+         service_pods[0].status.pod_ip+"/32",
+         service_pods[0].metadata.name)
+        client_pod_name = self.check_service_internal_connectivity(
+            namespace=namespace_name,
+            labels=client_label,
+            cleanup=False)
+        client_pod_ip = self.get_pod_ip(client_pod_name,
+                                        namespace=namespace_name)
+        client_pod_cidr = client_pod_ip + "/32"
+        LOG.debug("Client pod %s was created", client_pod_name)
+        LOG.debug("Connection to service %s from %s was successful",
+                  self.service_name, client_pod_name)
+        # Check connectivity in the same namespace
+        connect_to_service_cmd = ["/bin/sh", "-c", "curl {dst_ip}".format(
+                                  dst_ip=self.service_ip)]
+        blocked_pod, _ = self.create_pod(namespace=namespace_name)
+        self.assertIn(consts.POD_OUTPUT,
+                      self.exec_command_in_pod(blocked_pod,
+                                               connect_to_service_cmd,
+                                               namespace_name))
+
+        pods_server_match_expression = {'key': 'app',
+                                        'operator': 'In',
+                                        'values': ['server']}
+        pods_client_match_expression = {'key': 'app',
+                                        'operator': 'In',
+                                        'values': ['client']}
+        np_server = self.create_network_policy(
+            name=np_name_server,
+            namespace=namespace_name,
+            match_labels=server_label,
+            ingress_match_expressions=[pods_client_match_expression],
+            egress_match_expressions=[pods_client_match_expression])
+        LOG.debug("Network policy %s with match expression %s was created",
+                  np_server, pods_server_match_expression)
+        self.addCleanup(self.delete_network_policy, np_server.metadata.name,
+                        namespace_name)
+        np_client = self.create_network_policy(
+            name=np_name_client,
+            namespace=namespace_name,
+            match_labels=client_label,
+            ingress_match_expressions=[pods_server_match_expression],
+            egress_match_expressions=[pods_server_match_expression])
+        LOG.debug("Network policy %s with match expression %s was created",
+                  np_client, pods_client_match_expression)
+        self.addCleanup(self.delete_network_policy, np_client.metadata.name,
+                        namespace_name)
+        self.check_sg_rules_for_np(
+                namespace_name, np_name_server,
+                ingress_cidrs_should_exist=[client_pod_cidr],
+                egress_cidrs_should_exist=[client_pod_cidr],
+                ingress_cidrs_shouldnt_exist=[],
+                egress_cidrs_shouldnt_exist=[])
+        self.check_sg_rules_for_np(
+                namespace_name, np_name_client,
+                ingress_cidrs_should_exist=service_pods_cidrs,
+                egress_cidrs_should_exist=service_pods_cidrs,
+                ingress_cidrs_shouldnt_exist=[],
+                egress_cidrs_shouldnt_exist=[])
+        self.check_service_internal_connectivity(namespace=namespace_name,
+                                                 pod_name=client_pod_name)
+        LOG.debug("Connection to service %s from %s was successful after "
+                  "network policy was applied",
+                  self.service_name, client_pod_name)
+
+        # Check no connectivity from a pod not in the NP
+        self.assertNotIn(consts.POD_OUTPUT,
+                         self.exec_command_in_pod(blocked_pod,
+                                                  connect_to_service_cmd,
+                                                  namespace_name))
+
+        self.delete_pod(first_server_pod_name, namespace=namespace_name)
+        LOG.debug("Deleted pod %s from service %s",
+                  first_server_pod_name, self.service_name)
+        self.verify_lbaas_endpoints_configured(self.service_name,
+                                               1, namespace_name)
+        self.check_service_internal_connectivity(namespace=namespace_name,
+                                                 pod_name=client_pod_name,
+                                                 pod_num=1)
+        LOG.debug("Connection to service %s with one pod from %s was "
+                  "successful", self.service_name, client_pod_name)
+
+        pod_name, pod = self.create_pod(labels=server_label,
+                                        namespace=namespace_name)
+        LOG.debug("Pod server %s with label %s was created",
+                  pod_name, server_label)
+        self.verify_lbaas_endpoints_configured(self.service_name,
+                                               2, namespace_name)
+        service_pods = self.get_pod_list(namespace=namespace_name,
+                                         label_selector='app=server')
+        service_pods_cidrs = [pod.status.pod_ip+'/32' for pod in service_pods]
+        self.check_sg_rules_for_np(
+            namespace_name, np_name_server,
+            ingress_cidrs_should_exist=[client_pod_cidr],
+            egress_cidrs_should_exist=[client_pod_cidr],
+            ingress_cidrs_shouldnt_exist=[],
+            egress_cidrs_shouldnt_exist=[])
+        self.check_sg_rules_for_np(
+            namespace_name, np_name_client,
+            ingress_cidrs_should_exist=service_pods_cidrs,
+            egress_cidrs_should_exist=service_pods_cidrs,
+            ingress_cidrs_shouldnt_exist=[
+                first_server_pod_cidr],
+            egress_cidrs_shouldnt_exist=[
+                first_server_pod_cidr])
+        self.check_service_internal_connectivity(namespace=namespace_name,
+                                                 pod_name=client_pod_name)
+        LOG.debug("Connection to service %s from %s was successful",
+                  self.service_name, client_pod_name)
+        # Check no connectivity from a pod not in the NP
+        self.assertNotIn(consts.POD_OUTPUT,
+                         self.exec_command_in_pod(blocked_pod,
+                                                  connect_to_service_cmd,
+                                                  namespace_name))
