@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 # Names of latest versions of each package
-export VERSION_MUSL=musl-1.1.18
+export VERSION_MUSL=musl-1.2.0
 export VERSION_ZLIB=zlib-1.2.11
-export VERSION_LIBRESSL=libressl-2.6.3
-export VERSION_CURL=curl-7.58.0
+export VERSION_LIBRESSL=libressl-3.2.1
+export VERSION_CURL=curl-7.72.0
 
 # URLs to the source directories
 export SOURCE_MUSL=http://www.musl-libc.org/releases/
