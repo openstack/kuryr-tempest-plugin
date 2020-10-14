@@ -28,15 +28,22 @@
     name: kuryr-kubernetes-tempest-ussuri
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/ussuri
+    nodeset: openstack-single-node-bionic
+    vars:
+      # Default swap size got shrinked to 1 GB, it's way too small for us.
+      configure_swap_size: 8192
 
 - job:
     name: kuryr-kubernetes-tempest-train
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/train
+    nodeset: openstack-single-node-bionic
     required-projects:
     - name: openstack/diskimage-builder
       override-checkout: 2.30.0
     vars:
+      # Default swap size got shrinked to 1 GB, it's way too small for us.
+      configure_swap_size: 8192
       devstack_localrc:
         USE_PYTHON3: True
 
@@ -44,9 +51,12 @@
     name: kuryr-kubernetes-tempest-stein
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/stein
+    nodeset: openstack-single-node-bionic
     required-projects:
     - name: openstack/diskimage-builder
       override-checkout: 2.30.0
     vars:
+      # Default swap size got shrinked to 1 GB, it's way too small for us.
+      configure_swap_size: 8192
       devstack_localrc:
         USE_PYTHON3: True
