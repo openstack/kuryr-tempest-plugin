@@ -1,4 +1,4 @@
-FROM alpine:3.8
+FROM alpine:3.12
 
 RUN apk add --no-cache \
 		bash \
@@ -13,7 +13,7 @@ RUN apk add --no-cache \
 		perl \
 		tzdata
 
-ENV BUSYBOX_VERSION 1.29.0
+ENV BUSYBOX_VERSION 1.31.1
 
 RUN set -ex; \
 	tarball="busybox-${BUSYBOX_VERSION}.tar.bz2"; \
