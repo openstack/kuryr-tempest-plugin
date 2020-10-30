@@ -41,16 +41,19 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
 
     def get_sg_rules_for_np(self, namespace, network_policy_name):
         start = time.time()
+        sg_id = None
+        ready = False
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                sg_id, _ = self.get_np_crd_info(name=network_policy_name,
-                                                namespace=namespace)
-                if sg_id:
+                sg_id, _, ready = self.get_np_crd_info(
+                    name=network_policy_name, namespace=namespace)
+                if sg_id and ready:
                     break
             except kubernetes.client.rest.ApiException:
                 continue
         self.assertIsNotNone(sg_id)
+        self.assertTrue(ready)
         return self.list_security_group_rules(sg_id)
 
     def check_sg_rules_for_np(self, namespace, np,
@@ -93,7 +96,6 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
             raise lib_exc.TimeoutException(msg)
 
     @decorators.idempotent_id('a9db5bc5-e921-4719-8201-5431537c86f8')
-    @decorators.unstable_test(bug="1860554")
     def test_ipblock_network_policy_sg_rules(self):
         ingress_ipblock = "5.5.5.0/24"
         egress_ipblock = "4.4.4.0/24"
@@ -108,17 +110,19 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
                         namespace_name)
         network_policy_name = np.metadata.name
         sg_id = None
+        ready = False
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                sg_id, _ = self.get_np_crd_info(network_policy_name,
-                                                namespace=namespace_name)
-                if sg_id:
+                sg_id, _, ready = self.get_np_crd_info(
+                    network_policy_name, namespace=namespace_name)
+                if sg_id and ready:
                     break
             except kubernetes.client.rest.ApiException:
                 continue
         self.assertIsNotNone(sg_id)
+        self.assertTrue(ready)
         sec_group_rules = self.list_security_group_rules(sg_id)
         ingress_block_found, egress_block_found = False, False
         for rule in sec_group_rules:
@@ -189,8 +193,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                sg_id, _ = self.get_np_crd_info(network_policy_name,
-                                                namespace=namespace_name)
+                sg_id, _, _ = self.get_np_crd_info(network_policy_name,
+                                                   namespace=namespace_name)
                 if sg_id:
                     break
             except kubernetes.client.rest.ApiException:
@@ -260,7 +264,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                sg_id, _ = self.get_np_crd_info(network_policy_name)
+                sg_id, _, _ = self.get_np_crd_info(network_policy_name)
                 if sg_id:
                     break
             except kubernetes.client.rest.ApiException:
@@ -303,7 +307,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                _, crd_pod_selector = self.get_np_crd_info(network_policy_name)
+                _, crd_pod_selector, _ = self.get_np_crd_info(
+                    network_policy_name)
                 if crd_pod_selector:
                     break
             except kubernetes.client.rest.ApiException:
@@ -323,7 +328,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                _, crd_pod_selector = self.get_np_crd_info(network_policy_name)
+                _, crd_pod_selector, _ = self.get_np_crd_info(
+                    network_policy_name)
                 labels = crd_pod_selector.get('matchLabels')
                 if labels.get(label_key):
                     break
@@ -349,8 +355,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                sg_id, _ = self.get_np_crd_info(network_policy_name,
-                                                namespace=ns_name)
+                sg_id, _, _ = self.get_np_crd_info(network_policy_name,
+                                                   namespace=ns_name)
                 if sg_id:
                     break
             except kubernetes.client.rest.ApiException:
@@ -397,8 +403,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                sg_id, _ = self.get_np_crd_info(network_policy_name,
-                                                namespace=ns_name)
+                sg_id, _, _ = self.get_np_crd_info(network_policy_name,
+                                                   namespace=ns_name)
                 if sg_id:
                     break
             except kubernetes.client.rest.ApiException:

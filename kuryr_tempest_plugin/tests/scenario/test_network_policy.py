@@ -144,9 +144,9 @@ class OldNetworkPolicyScenario(base_np.TestNetworkPolicyScenario):
             group=base.KURYR_CRD_GROUP, version=base.KURYR_CRD_VERSION,
             namespace=namespace, plural=KURYR_NET_POLICY_CRD_PLURAL,
             name=name, **kwargs)
-
         return (crd['spec'].get('securityGroupId'),
-                crd['spec'].get('podSelector'))
+                crd['spec'].get('podSelector'),
+                True)
 
 
 class NetworkPolicyScenario(base_np.TestNetworkPolicyScenario):
@@ -165,5 +165,11 @@ class NetworkPolicyScenario(base_np.TestNetworkPolicyScenario):
             namespace=namespace, plural=KURYR_NETWORK_POLICY_CRD_PLURAL,
             name=name, **kwargs)
 
+        expected = len(crd['spec'].get('egressSgRules', []) +
+                       crd['spec'].get('ingressSgRules', []))
+        existing = len(crd['status']['securityGroupRules'])
+
+        # Third result tells us if all the SG rules are created.
         return (crd['status'].get('securityGroupId'),
-                crd['status'].get('podSelector'))
+                crd['status'].get('podSelector'),
+                expected == existing)
