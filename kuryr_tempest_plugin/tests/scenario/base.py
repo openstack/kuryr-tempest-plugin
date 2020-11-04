@@ -333,7 +333,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     def exec_command_in_pod(self, pod_name, command, namespace="default",
                             stderr=False, container=None,
-                            req_timeout=10, f_timeout=2):
+                            req_timeout=60, f_timeout=2):
         api = self.k8s_client.CoreV1Api()
         kwargs = dict(command=command, stdin=False, stdout=True, tty=False,
                       stderr=stderr)
@@ -355,7 +355,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     kwargs['_request_timeout'] = req_timeout
                 if stderr:
                     kwargs['_preload_content'] = False
-                    resp = stream(api.connect_get_namespaced_pod_exec,
+                    resp = stream(api.connect_post_namespaced_pod_exec,
                                   pod_name, namespace, **kwargs)
                     # Run until completion
                     resp.run_forever(timeout=f_timeout)
