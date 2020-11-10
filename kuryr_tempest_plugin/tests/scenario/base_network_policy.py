@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import kubernetes
+import abc
 import time
 
+import kubernetes
 import netaddr
+
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
@@ -30,7 +32,8 @@ CONF = config.CONF
 TIMEOUT_PERIOD = 180
 
 
-class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
+class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
+                                metaclass=abc.ABCMeta):
 
     @classmethod
     def skip_checks(cls):
@@ -94,6 +97,10 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest):
         if not rules_match:
             msg = 'Timed out waiting sg rules for np %s to match' % np
             raise lib_exc.TimeoutException(msg)
+
+    @abc.abstractmethod
+    def get_np_crd_info(self, name, namespace='default', **kwargs):
+        pass
 
     @decorators.idempotent_id('a9db5bc5-e921-4719-8201-5431537c86f8')
     def test_ipblock_network_policy_sg_rules(self):
