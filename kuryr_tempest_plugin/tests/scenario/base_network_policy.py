@@ -540,6 +540,13 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
                                                  pod_num=1)
         LOG.debug("Connection to service %s with one pod from %s was "
                   "successful", self.service_name, client_pod_name)
+        # Check that the deleted pod is removed from SG rules
+        self.check_sg_rules_for_np(
+            namespace_name, np_name_client,
+            ingress_cidrs_shouldnt_exist=[
+                first_server_pod_cidr],
+            egress_cidrs_shouldnt_exist=[
+                first_server_pod_cidr])
 
         pod_name, pod = self.create_pod(labels=server_label,
                                         namespace=namespace_name)
@@ -559,11 +566,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         self.check_sg_rules_for_np(
             namespace_name, np_name_client,
             ingress_cidrs_should_exist=service_pods_cidrs,
-            egress_cidrs_should_exist=service_pods_cidrs,
-            ingress_cidrs_shouldnt_exist=[
-                first_server_pod_cidr],
-            egress_cidrs_shouldnt_exist=[
-                first_server_pod_cidr])
+            egress_cidrs_should_exist=service_pods_cidrs)
         self.check_service_internal_connectivity(namespace=namespace_name,
                                                  pod_name=client_pod_name)
         LOG.debug("Connection to service %s from %s was successful",
