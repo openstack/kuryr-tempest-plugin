@@ -12,4 +12,4 @@ docker rm ${BUILDER_NAME}
 chmod +s rootfs/bin/busybox
 tar -J -f rootfs.tar.xz --numeric-owner --exclude='dev/*' -C rootfs -c .
 rm -fr rootfs
-docker build -t kuryr/demo . -f Dockerfile
+docker build -t quay.io/kuryr/demo . -f Dockerfile

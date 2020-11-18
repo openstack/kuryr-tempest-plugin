@@ -87,8 +87,8 @@ RUN set -ex \
 		busybox \
 	&& ./busybox --help \
 	&& mkdir -p rootfs/bin \
-	&& ln -vL busybox rootfs/bin/ \
-	&& chroot rootfs /bin/busybox --install /bin
+	&& cp busybox rootfs/bin/ \
+	&& chroot rootfs /bin/busybox --install -s /bin
 
 # grab a simplified getconf port from Alpine we can statically compile
 RUN set -x \

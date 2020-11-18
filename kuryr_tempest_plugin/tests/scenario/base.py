@@ -166,7 +166,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 name=np_name, namespace=np_namespace)
 
     @classmethod
-    def create_pod(cls, name=None, labels=None, image='kuryr/demo',
+    def create_pod(cls, name=None, labels=None, image='quay.io/kuryr/demo',
                    namespace="default", annotations=None, wait_for_status=True,
                    affinity=None):
         if not name:
