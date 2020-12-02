@@ -117,3 +117,22 @@ class TestUdpServiceScenario(base.BaseKuryrScenarioTest):
         # as the focus of this test is not to check FIP connectivity.
         self.check_service_internal_connectivity(service_port='90',
                                                  protocol='UDP')
+
+
+class TestServiceWithoutSelectorScenario(base.BaseKuryrScenarioTest):
+
+    @classmethod
+    def skip_checks(cls):
+        super(TestServiceWithoutSelectorScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.test_services_without_selector:
+            raise cls.skipException("Service without selectors tests"
+                                    " are not enabled")
+
+    @decorators.idempotent_id('bb8cc977-c867-4766-b623-133d8495ee50')
+    def test_service_without_selector(self):
+        # Create a service without selector
+        ns_name, ns_obj = self.create_namespace()
+        self.addCleanup(self.delete_namespace, ns_name)
+        self.service_without_selector_base(namespace=ns_name)
+
+        self.check_service_internal_connectivity(namespace=ns_name)

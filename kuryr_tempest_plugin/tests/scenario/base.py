@@ -655,6 +655,75 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                         namespace=namespace)
 
     @classmethod
+    def service_without_selector_base(cls, pod_num=2,
+                                      spec_type="ClusterIP",
+                                      protocol="TCP",
+                                      port=80,
+                                      target_port=8080,
+                                      namespace="default",
+                                      get_ip=True,
+                                      service_name=None):
+
+        """Create a setup for services without selector
+
+        This method creates a pod, service without selector and endpoint.
+        """
+        pod_name_list = []
+        for i in range(pod_num):
+            pod_name, pod = cls.create_pod(namespace=namespace)
+            pod_name_list.append(pod_name)
+
+        cls.pod_num = pod_num
+        service_name, service_obj = cls.create_service(
+            spec_type=spec_type, protocol=protocol, port=port,
+            target_port=target_port, namespace=namespace,
+            service_name=service_name, pod_label=None)
+        pod_1_ip = cls.get_pod_ip(pod_name_list[0], namespace=namespace)
+        pod_2_ip = cls.get_pod_ip(pod_name_list[1], namespace=namespace)
+        port = service_obj.spec.ports[0]
+        port_name = port.name
+        # Endpoints is a collection of endpoints that implement
+        # the actual service
+        endpoint = cls.k8s_client.V1Endpoints()
+        endpoint.metadata = cls.k8s_client.V1ObjectMeta(name=service_name)
+        # EndpointSubset is a group of addresses with a set of ports
+        endpoint.subsets = [cls.k8s_client.V1EndpointSubset(
+                            addresses=[
+                                cls.k8s_client.V1EndpointAddress(
+                                    ip=pod_1_ip),
+                                cls.k8s_client.V1EndpointAddress(
+                                    ip=pod_2_ip
+                                )
+                            ],
+                            ports=[cls.k8s_client.V1EndpointPort(
+                                  name=port_name,
+                                  port=target_port,
+                                  protocol=protocol)])]
+        cls.k8s_client.CoreV1Api().create_namespaced_endpoints(
+            namespace=namespace, body=endpoint)
+        if get_ip:
+            cls.service_ip = cls.get_service_ip(
+                service_name, spec_type=spec_type, namespace=namespace)
+            cls.verify_lbaas_endpoints_configured(service_name, pod_num,
+                                                  namespace)
+            cls.service_name = service_name
+
+    @classmethod
+    def wait_for_ns_serviceaccount(cls, namespace,
+                                   timeout_period=consts.NS_TIMEOUT):
+        start = time.time()
+        while time.time() - start < timeout_period:
+            time.sleep(5)
+            try:
+                cls.k8s_client.CoreV1Api().read_namespaced_service_account(
+                    'default', namespace)
+                return True
+            except kubernetes.client.rest.ApiException:
+                pass
+
+        return False
+
+    @classmethod
     def create_namespace(cls, name=None, wait_for_crd=True,
                          timeout_period=consts.NS_TIMEOUT):
         if not name:
@@ -664,7 +733,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         namespace_obj = cls.k8s_client.CoreV1Api().create_namespace(
             body=namespace)
 
-        if not wait_for_crd:
+        if not wait_for_crd or not CONF.kuryr_kubernetes.subnet_per_namespace:
+            # You cannot create pods until default ServiceAccount for the
+            # namespace is created, let's wait for it.
+            if not cls.wait_for_ns_serviceaccount(name):
+                raise lib_exc.TimeoutException(
+                    "Timed out waiting for default ServiceAccount to get "
+                    "created in %s namespace. Is "
+                    "kubernetes-controller-manager running?" % name)
+
             return name, namespace_obj
 
         start = time.time()

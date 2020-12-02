@@ -91,4 +91,7 @@ kuryr_k8s_opts = [
     cfg.BoolOpt("ipv6", default=False,
                 help="True if Kuryr is configured to use IPv6 subnets as pod "
                      "and service subnets."),
+    cfg.BoolOpt("test_services_without_selector", default=False,
+                help="Whether or not service without selector tests will be "
+                "running"),
 ]
