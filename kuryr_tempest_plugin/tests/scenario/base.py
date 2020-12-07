@@ -22,6 +22,7 @@ import time
 
 from oslo_log import log as logging
 
+import netaddr
 import requests
 
 import kubernetes
@@ -724,12 +725,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return False
 
     @classmethod
-    def create_namespace(cls, name=None, wait_for_crd=True,
+    def create_namespace(cls, name=None, labels=None,
+                         wait_for_crd=True,
                          timeout_period=consts.NS_TIMEOUT):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-namespace')
         namespace = cls.k8s_client.V1Namespace()
-        namespace.metadata = cls.k8s_client.V1ObjectMeta(name=name)
+        namespace.metadata = cls.k8s_client.V1ObjectMeta(name=name,
+                                                         labels=labels)
         namespace_obj = cls.k8s_client.CoreV1Api().create_namespace(
             body=namespace)
 
@@ -1331,3 +1334,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             protocol,
             namespace_name=namespace)
         return pod_name
+
+    def get_curl_template(self, ip_or_cidr, extra_args='', port=False):
+        ipn = netaddr.IPNetwork(ip_or_cidr)
+
+        curl_tmpl = "curl " + extra_args if extra_args else "curl"
+        curl_tmpl = (curl_tmpl + " [{}]"
+                     if ipn.version == 6 else curl_tmpl + " {}")
+
+        return curl_tmpl + "{}" if port else curl_tmpl

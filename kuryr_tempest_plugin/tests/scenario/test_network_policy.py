@@ -13,15 +13,18 @@
 # limitations under the License.
 
 import json
+import time
 
 import kubernetes
 
 from oslo_log import log as logging
 from tempest import config
+from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 
 from kuryr_tempest_plugin.tests.scenario import base
 from kuryr_tempest_plugin.tests.scenario import base_network_policy as base_np
+from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -173,3 +176,161 @@ class NetworkPolicyScenario(base_np.TestNetworkPolicyScenario):
         return (crd['status'].get('securityGroupId'),
                 crd['status'].get('podSelector'),
                 expected == existing)
+
+
+class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
+
+    @classmethod
+    def skip_checks(cls):
+        super(ServiceWOSelectorsNPScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.network_policy_enabled:
+            raise cls.skipException('Network Policy driver and handler must '
+                                    'be enabled to run this tests')
+        if not CONF.kuryr_kubernetes.test_services_without_selector:
+            raise cls.skipException("Service without selectors tests are not "
+                                    "enabled")
+        if not CONF.kuryr_kubernetes.new_kuryrnetworkpolicy_crd:
+            raise cls.skipException('New KuryrNetworkPolicy NP CRDs must be '
+                                    'used to run these tests')
+
+    def get_np_crd_info(self, name, namespace='default', **kwargs):
+        crd = self.k8s_client.CustomObjectsApi().get_namespaced_custom_object(
+            group=base.KURYR_CRD_GROUP, version=base.KURYR_CRD_VERSION,
+            namespace=namespace, plural=KURYR_NETWORK_POLICY_CRD_PLURAL,
+            name=name, **kwargs)
+
+        expected = len(crd['spec'].get('egressSgRules', []) +
+                       crd['spec'].get('ingressSgRules', []))
+        existing = len(crd['status']['securityGroupRules'])
+
+        # Third result tells us if all the SG rules are created.
+        return (crd['status'].get('securityGroupId'),
+                crd['status'].get('podSelector'),
+                expected == existing)
+
+    @decorators.idempotent_id('abcfa34d-078c-485f-a80d-765c173d7652')
+    def test_egress_np_to_service_wo_selectors(self):
+
+        # create namespace for client
+        client_ns_name = data_utils.rand_name(prefix='client-ns')
+        client_label = {'app': data_utils.rand_name('client')}
+        self.create_namespace(name=client_ns_name)
+        self.addCleanup(self.delete_namespace, client_ns_name)
+
+        # create client pod in client ns
+        client_pod_name = data_utils.rand_name(prefix='client-pod')
+        self.create_pod(namespace=client_ns_name, name=client_pod_name,
+                        labels=client_label)
+
+        # create ns for server
+        server_ns_name = data_utils.rand_name(prefix='server-ns')
+        server_label = {'app': data_utils.rand_name('server')}
+        self.create_namespace(name=server_ns_name, labels=server_label)
+        self.addCleanup(self.delete_namespace, server_ns_name)
+
+        # create server pod under it
+        server_pod_name = data_utils.rand_name(prefix='server-pod')
+        self.create_pod(namespace=server_ns_name, name=server_pod_name,
+                        labels=server_label)
+        server_pod_addr = self.get_pod_ip(server_pod_name,
+                                          namespace=server_ns_name)
+
+        # create another server pod with different label
+        server2_label = {'app': data_utils.rand_name('server2')}
+        server2_pod_name = data_utils.rand_name(prefix='server2-pod')
+        self.create_pod(namespace=server_ns_name, name=server2_pod_name,
+                        labels=server2_label)
+        server2_pod_addr = self.get_pod_ip(server2_pod_name,
+                                           namespace=server_ns_name)
+
+        # create service w/o selectors
+        service_name, _ = self.create_service(namespace=server_ns_name,
+                                              pod_label=None)
+        # manually create endpoint for the service
+        endpoint = self.k8s_client.V1Endpoints()
+        endpoint.metadata = self.k8s_client.V1ObjectMeta(name=service_name)
+        addresses = [self.k8s_client.V1EndpointAddress(ip=server_pod_addr)]
+        endpoint.subsets = [self.k8s_client.V1EndpointSubset(
+                            addresses=addresses,
+                            ports=[self.k8s_client.V1EndpointPort(
+                                  name=None, port=8080, protocol='TCP')])]
+        self.k8s_client.CoreV1Api().create_namespaced_endpoints(
+            namespace=server_ns_name, body=endpoint)
+
+        # create another service
+        service2_name, _ = self.create_service(namespace=server_ns_name,
+                                               pod_label=None)
+        # manually create endpoint for the service
+        endpoint = self.k8s_client.V1Endpoints()
+        endpoint.metadata = self.k8s_client.V1ObjectMeta(name=service2_name)
+        addresses = [self.k8s_client.V1EndpointAddress(ip=server2_pod_addr)]
+        endpoint.subsets = [self.k8s_client.V1EndpointSubset(
+                            addresses=addresses,
+                            ports=[self.k8s_client.V1EndpointPort(
+                                  name=None, port=8080, protocol='TCP')])]
+        self.k8s_client.CoreV1Api().create_namespaced_endpoints(
+            namespace=server_ns_name, body=endpoint)
+
+        # check endpoints configured
+        service_ip = self.get_service_ip(service_name,
+                                         namespace=server_ns_name)
+        service2_ip = self.get_service_ip(service2_name,
+                                          namespace=server_ns_name)
+        self.verify_lbaas_endpoints_configured(service_name, 1, server_ns_name)
+        self.verify_lbaas_endpoints_configured(service2_name, 1,
+                                               server_ns_name)
+
+        # check connectivity
+        curl_tmpl = self.get_curl_template(service_ip, extra_args='-m 10')
+        cmd = ["/bin/sh", "-c", curl_tmpl.format(service_ip)]
+        cmd2 = ["/bin/sh", "-c", curl_tmpl.format(service2_ip)]
+        self.assertIn(consts.POD_OUTPUT,
+                      self.exec_command_in_pod(client_pod_name, cmd,
+                                               namespace=client_ns_name))
+        self.assertIn(consts.POD_OUTPUT,
+                      self.exec_command_in_pod(client_pod_name, cmd2,
+                                               namespace=client_ns_name))
+
+        # create NP for client to be able to reach server
+        np_name = data_utils.rand_name(prefix='kuryr-np')
+        np = self.k8s_client.V1NetworkPolicy()
+        np.kind = 'NetworkPolicy'
+        np.api_version = 'networking.k8s.io/v1'
+        np.metadata = self.k8s_client.V1ObjectMeta(name=np_name,
+                                                   namespace=client_ns_name)
+        to = self.k8s_client.V1NetworkPolicyPeer(
+            pod_selector=self.k8s_client.V1LabelSelector(
+                match_labels=server_label),
+            namespace_selector=self.k8s_client.V1LabelSelector(
+                match_labels=server_label))
+
+        np.spec = self.k8s_client.V1NetworkPolicySpec(
+            pod_selector=self.k8s_client.V1LabelSelector(
+                    match_labels=client_label),
+            policy_types=['Egress'],
+            egress=[self.k8s_client.V1NetworkPolicyEgressRule(to=[to])])
+
+        np = (self.k8s_client.NetworkingV1Api()
+              .create_namespaced_network_policy(namespace=client_ns_name,
+                                                body=np))
+        self.addCleanup(self.delete_network_policy, np.metadata.name,
+                        client_ns_name)
+        start = time.time()
+        while time.time() - start < TIMEOUT_PERIOD:
+            try:
+                time.sleep(1)
+                _, crd_pod_selector, _ = self.get_np_crd_info(np_name)
+                if crd_pod_selector:
+                    break
+            except kubernetes.client.rest.ApiException:
+                continue
+
+        # after applying NP, we still should have an access from client to the
+        # service with matched labels,
+        self.assertIn(consts.POD_OUTPUT,
+                      self.exec_command_in_pod(client_pod_name, cmd,
+                                               namespace=client_ns_name))
+        # while for the other service, we should not.
+        self.assertNotIn(consts.POD_OUTPUT,
+                         self.exec_command_in_pod(client_pod_name, cmd2,
+                                                  namespace=client_ns_name))
