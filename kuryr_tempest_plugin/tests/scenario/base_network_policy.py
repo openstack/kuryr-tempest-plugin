@@ -146,6 +146,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
     def test_ipblock_network_policy_allow_except(self):
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
+
         if CONF.kuryr_kubernetes.kuryrnetworks:
             cidr = self.get_kuryr_network_crds(
                 namespace_name)['status']['subnetCIDR']
@@ -156,10 +157,10 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
 
         ipn = netaddr.IPNetwork(cidr)
         max_prefixlen = "/32"
-        curl_tmpl = "curl {}{}"
         if ipn.version == 6:
             max_prefixlen = "/128"
-            curl_tmpl = "curl [{}]{}"
+
+        curl_tmpl = self.get_curl_template(cidr, extra_args='-m 5', port=True)
 
         allow_all_cidr = cidr
         pod_ip_list = []
