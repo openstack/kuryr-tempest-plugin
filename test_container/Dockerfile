@@ -1,4 +1,4 @@
-FROM alpine:3.12
+FROM quay.io/kuryr/alpine:3.12
 
 ADD rootfs.tar.xz /
 RUN apk update && apk add iputils
