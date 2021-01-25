@@ -7,8 +7,12 @@ function build_test_container {
     #               hence this awful if clause.
     if [[ ${CONTAINER_ENGINE} == 'crio' ]]; then
         sudo buildah bud -t quay.io/kuryr/demo -f Dockerfile .
+        sudo buildah bud -t quay.io/kuryr/sctp-demo -f \
+            kuryr_sctp_demo/Dockerfile .
     else
         docker build -t quay.io/kuryr/demo . -f Dockerfile
+        docker build -t quay.io/kuryr/sctp-demo . -f \
+            kuryr_sctp_demo/Dockerfile
     fi
     popd
 }
