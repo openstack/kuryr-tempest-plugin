@@ -42,14 +42,19 @@ Clone this repository and call from the repo::
 Running the tests
 -----------------
 
-To run all the tests from this plugin, call from the tempest repo::
+To verify the functionality of Kuryr by running tests from this plugin;
+From the tempest repo, initialize stestr::
 
-    $ tox -e all -- kuryr_tempest_plugin
+    $ stestr init
+
+Then, to run all the tests from this plugin, call::
+
+    $ tempest run -r 'kuryr_tempest_plugin.*'
 
 To run a single test case, call with full path, for example::
 
-    $ tox -e all -- kuryr_tempest_plugin.tests.scenario.test_cross_ping.TestCrossPingScenario.test_vm_pod_ping
+    $ tempest run -r 'kuryr_tempest_plugin.tests.scenario.test_cross_ping.TestCrossPingScenario.test_vm_pod_ping*'
 
 To retrieve a list of all tempest tests, run::
 
-    $ testr list-tests
+    $ tempest run -l
