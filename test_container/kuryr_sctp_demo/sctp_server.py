@@ -11,14 +11,16 @@
 # limitations under the License.
 
 import platform
-import sctp
 import socket
 
+import sctp
 
-host = '0.0.0.0'
+
+host = '::'
 port = 9090
 
-sock = sctp.sctpsocket_tcp(socket.AF_INET)
+sock = sctp.sctpsocket_tcp(socket.AF_INET6)
+sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
 sock.bind((host, port))
 sock.listen(1)
 

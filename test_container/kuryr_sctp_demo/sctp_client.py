@@ -15,17 +15,31 @@ import sys
 
 import sctp
 
-sk = sctp.sctpsocket_tcp(socket.AF_INET)
-
 
 def connect_plus_message(out_ip, out_port):
-    sk.connect((out_ip, out_port))
-    print("Sending Message")
-    sk.sctp_send(msg='HELLO, I AM ALIVE!!!')
-    msgFromServer = sk.recvfrom(1024)
-    print(msgFromServer[0].decode('utf-8'))
-    sk.shutdown(0)
-    sk.close()
+    for res in socket.getaddrinfo(out_ip, out_port, socket.AF_UNSPEC,
+                                  socket.SOCK_STREAM, 0, socket.AI_PASSIVE):
+        addr_fam, socktype, proto, canonname, sa = res
+        try:
+            sock = sctp.sctpsocket_tcp(addr_fam)
+        except OSError:
+            sock = None
+            continue
+        try:
+            sock.connect(sa)
+        except OSError:
+            sock.close()
+            sock = None
+            continue
+        break
+
+    if sock:
+        print("Sending Message")
+        sock.sctp_send(msg='HELLO, I AM ALIVE!!!')
+        msg_from_server = sock.recvfrom(1024)
+        print(msg_from_server[0].decode('utf-8'))
+        sock.shutdown(0)
+        sock.close()
 
 
 if __name__ == '__main__':
