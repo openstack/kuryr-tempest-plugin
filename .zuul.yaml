@@ -47,6 +47,7 @@
     vars:
       devstack_localrc:
         USE_PYTHON3: True
+    voting: false
 
 - job:
     name: kuryr-kubernetes-tempest-stein
