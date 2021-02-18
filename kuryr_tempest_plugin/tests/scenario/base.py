@@ -1260,7 +1260,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             # Wait until kuryr-controller pools are reloaded, i.e.,
             # kuryr-controller is ready
             res = test_utils.call_until_true(
-                self.get_pod_readiness, 30, 1, kuryr_pod_name,
+                self.get_pod_readiness, 60, 1, kuryr_pod_name,
                 namespace=system_namespace, container_name='controller')
             self.assertTrue(res, 'Timed out waiting for '
                                  'kuryr-controller to reload pools.')
