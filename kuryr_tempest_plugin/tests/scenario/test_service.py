@@ -136,3 +136,22 @@ class TestServiceWithoutSelectorScenario(base.BaseKuryrScenarioTest):
         self.service_without_selector_base(namespace=ns_name)
 
         self.check_service_internal_connectivity(namespace=ns_name)
+
+
+class TestSCTPServiceScenario(base.BaseKuryrScenarioTest):
+
+    @classmethod
+    def skip_checks(cls):
+        super(TestSCTPServiceScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
+        if not CONF.kuryr_kubernetes.test_sctp_services:
+            raise cls.skipException("Service SCTP tests are not enabled")
+
+    @decorators.idempotent_id('bb8cc977-c867-4766-b623-137d8395cb60')
+    def test_service_sctp_ping(self):
+        self.create_setup_for_service_test(
+            protocol="SCTP", port=90, target_port=9090)
+
+        self.check_service_internal_connectivity(
+            service_port='90', protocol='SCTP')

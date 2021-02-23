@@ -633,8 +633,13 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         label = label or data_utils.rand_name('kuryr-app')
         for i in range(pod_num):
-            pod_name, pod = cls.create_pod(
-                labels={"app": label}, namespace=namespace)
+            if protocol == "SCTP":
+                pod_name, pod = cls.create_pod(
+                    labels={"app": label}, image='quay.io/kuryr/sctp-demo',
+                    namespace=namespace)
+            else:
+                pod_name, pod = cls.create_pod(
+                    labels={"app": label}, namespace=namespace)
             if cleanup:
                 cls.addClassResourceCleanup(cls.delete_pod, pod_name,
                                             namespace=namespace)
@@ -956,6 +961,20 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 return
             return stdout
 
+        def req_sctp():
+            cmd = "python3 sctp_client.py {} {}".format(
+                server_ip, server_port)
+            pod_cmd = ["/bin/sh", "-c", cmd]
+            stdout, stderr = self.exec_command_in_pod(pod, pod_cmd,
+                                                      namespace=namespace_name,
+                                                      stderr=True)
+            if stderr:
+                LOG.error('Failed to reach service at {}:{} '
+                          'Err: {}'.format(server_ip, server_port, stderr))
+                time.sleep(10)
+                return
+            return stdout
+
         def pred(tester, responses):
             if protocol == 'TCP':
                 unique_resps = set(resp for resp in responses if resp)
@@ -972,6 +991,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             self.assertIsNotNone(server_port, "server_port must be "
                                               "provided for UDP protocol")
             req = req_udp
+        elif protocol == "SCTP":
+            self.assertIsNotNone(server_port, "server_port must be "
+                                              "provided for SCTP protocol")
+            req = req_sctp
         else:
             LOG.info("Unsupported protocol %s, returning", protocol)
             return
@@ -1322,7 +1345,13 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                                namespace=namespace)
         pod_num = pod_num or self.pod_num
         if not pod_name:
-            pod_name, _ = self.create_pod(namespace=namespace, labels=labels)
+            if protocol == "SCTP":
+                pod_name, _ = self.create_pod(
+                    labels=labels, image='quay.io/kuryr/sctp-demo',
+                    namespace=namespace)
+            else:
+                pod_name, _ = self.create_pod(
+                    namespace=namespace, labels=labels)
             if cleanup:
                 self.addClassResourceCleanup(self.delete_pod, pod_name,
                                              namespace=namespace)
