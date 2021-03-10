@@ -1090,7 +1090,13 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     def create_vm_for_connectivity_test(self):
         keypair = self.create_keypair()
-        sec_grp = self._create_security_group()
+        # NOTE(maysams): we need to support older versions of Tempest.
+        # So, let's try calling the non-private method and if fails
+        # we default to the private one.
+        try:
+            sec_grp = self._create_security_group()
+        except AttributeError:
+            sec_grp = self.create_security_group()
         security_groups = [
             {'name': sec_grp['name']}
         ]
