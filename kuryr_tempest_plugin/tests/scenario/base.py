@@ -427,6 +427,18 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 body=delete_options)
 
     @classmethod
+    def update_service(cls, service_name, annotation, namespace="default"):
+        api = cls.k8s_client.CoreV1Api()
+        service = api.read_namespaced_service(service_name, namespace)
+        service.metadata = cls.k8s_client.V1ObjectMeta(
+            name=service_name, annotations=annotation)
+
+        service_obj = api.patch_namespaced_service(body=service,
+                                                   name=service_name,
+                                                   namespace=namespace)
+        return service_obj
+
+    @classmethod
     def get_service_ip(
             cls, service_name, spec_type="ClusterIP", namespace="default"):
         api = cls.k8s_client.CoreV1Api()
@@ -513,6 +525,30 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 return ingress_ip
         msg = "Timed out waiting for lb crd status %s" % service_name
         raise lib_exc.TimeoutException(msg)
+
+    @classmethod
+    def get_listener_timeout_on_crd(cls, service_name, namespace):
+        api = cls.k8s_client.CoreV1Api()
+        service = api.read_namespaced_service(service_name, namespace)
+
+        if service.metadata.annotations:
+            try:
+                klb_crd = cls.get_kuryr_loadbalancer_crds(
+                    service_name, namespace)
+            except kubernetes.client.rest.ApiException:
+                return None, None
+            klb_status = klb_crd.get('status')
+            if klb_status and klb_status.get('listeners'):
+                try:
+                    for l in klb_status.get('listeners', []):
+                        timeout_cli = l.get('timeout_client_data')
+                        timeout_mb = l.get('timeout_member_data')
+
+                    return timeout_cli, timeout_mb
+                except KeyError:
+                    LOG.info("Waiting till LB's timeout appears in CRD")
+                    return None, None
+        return None, None
 
     @classmethod
     def wait_kuryr_annotation(cls, group, version, plural, annotation,
@@ -1378,3 +1414,26 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                      if ipn.version == 6 else curl_tmpl + " {}")
 
         return curl_tmpl + "{}" if port else curl_tmpl
+
+    def check_updated_listener_timeout(self, service_name,
+                                       namespace='default'):
+        annotation = {
+            'openstack.org/kuryr-timeout-client-data': '70000',
+            'openstack.org/kuryr-timeout-member-data': '75000'
+            }
+        updated_service = self.update_service(service_name=service_name,
+                                              annotation=annotation,
+                                              namespace=namespace)
+        annotated_values = [value for i, value in annotation.items()]
+        start = time.time()
+        while time.time() - start < consts.LB_TIMEOUT:
+            time.sleep(5)
+            timeout_cli, timeout_mem = self.get_listener_timeout_on_crd(
+                service_name=updated_service.metadata.name,
+                namespace=namespace)
+
+            lb_status_values = [str(timeout_cli), str(timeout_mem)]
+            if annotated_values == lb_status_values:
+                break
+
+        self.assertEqual(annotated_values, lb_status_values)

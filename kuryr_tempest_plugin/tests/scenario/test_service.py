@@ -155,3 +155,22 @@ class TestSCTPServiceScenario(base.BaseKuryrScenarioTest):
 
         self.check_service_internal_connectivity(
             service_port='90', protocol='SCTP')
+
+
+class TestListenerTimeoutScenario(base.BaseKuryrScenarioTest):
+
+    @classmethod
+    def skip_checks(cls):
+        super(TestListenerTimeoutScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
+        if not CONF.kuryr_kubernetes.test_configurable_listener_timeouts:
+            raise cls.skipException("Listener timeout tests are not enabled")
+
+    @decorators.idempotent_id('ca9bd886-d776-5675-b532-228c92a4da7f')
+    def test_updated_listener_timeouts(self):
+        self.create_setup_for_service_test(
+            service_name="kuryr-listener-demo")
+
+        self.check_updated_listener_timeout(
+            service_name="kuryr-listener-demo")
