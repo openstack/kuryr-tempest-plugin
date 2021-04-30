@@ -16,10 +16,12 @@ import abc
 import time
 
 import kubernetes
+from kubernetes import client as k8s_client
 import netaddr
 
 from oslo_log import log as logging
 from tempest import config
+from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
@@ -74,7 +76,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         rules_match = False
         start = time.time()
 
-        while ((not rules_match) and (time.time() - start < TIMEOUT_PERIOD)):
+        while not rules_match and (time.time() - start) < TIMEOUT_PERIOD:
             sg_rules = self.get_sg_rules_for_np(namespace, np)
 
             for rule in sg_rules:
@@ -86,11 +88,11 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
                 if (ingress_cidrs_should_exist.issubset(ingress_cidrs_found)
                     and (not ingress_cidrs_shouldnt_exist
                          or not ingress_cidrs_shouldnt_exist.issubset(
-                             ingress_cidrs_found))
+                                ingress_cidrs_found))
                     and egress_cidrs_should_exist.issubset(egress_cidrs_found)
                     and (not egress_cidrs_shouldnt_exist
                          or not egress_cidrs_shouldnt_exist.issubset(
-                            egress_cidrs_found))):
+                                egress_cidrs_found))):
                     rules_match = True
                 else:
                     time.sleep(10)
@@ -577,3 +579,52 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
                          self.exec_command_in_pod(blocked_pod,
                                                   connect_to_service_cmd,
                                                   namespace_name))
+
+    @decorators.idempotent_id('ee018bf6-2d5d-4c4e-8c79-793f4772852f')
+    def test_network_policy_hairpin_traffic(self):
+        namespace_name, namespace = self.create_namespace()
+        self.addCleanup(self.delete_namespace, namespace_name)
+        svc_name, svc_pods = self.create_setup_for_service_test(
+            namespace=namespace_name, cleanup=False, save=False, pod_num=1)
+        self.check_service_internal_connectivity(
+            namespace=namespace_name, pod_num=1, service_name=svc_name,
+            pod_name=svc_pods[0])
+        policy_name = data_utils.rand_name(prefix='kuryr-policy')
+
+        np = k8s_client.V1NetworkPolicy(
+            kind='NetworkPolicy',
+            api_version='networking.k8s.io/v1',
+            metadata=k8s_client.V1ObjectMeta(
+                name=policy_name,
+                namespace=namespace_name),
+            spec=k8s_client.V1NetworkPolicySpec(
+                pod_selector=k8s_client.V1LabelSelector(),
+                policy_types=['Egress', 'Ingress'],
+                ingress=[
+                    k8s_client.V1NetworkPolicyIngressRule(
+                        _from=[
+                            k8s_client.V1NetworkPolicyPeer(
+                                pod_selector=k8s_client.V1LabelSelector(),
+                            ),
+                        ],
+                    ),
+                ],
+                egress=[
+                    k8s_client.V1NetworkPolicyEgressRule(
+                        to=[
+                            k8s_client.V1NetworkPolicyPeer(
+                                pod_selector=k8s_client.V1LabelSelector(),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        k8s_client.NetworkingV1Api().create_namespaced_network_policy(
+            namespace=namespace_name, body=np)
+        # Just to wait for SGs.
+        self.get_sg_rules_for_np(namespace_name, policy_name)
+        self.check_service_internal_connectivity(
+            namespace=namespace_name, pod_num=1, service_name=svc_name,
+            pod_name=svc_pods[0])
