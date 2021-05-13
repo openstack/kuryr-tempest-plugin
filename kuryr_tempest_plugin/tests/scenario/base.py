@@ -665,9 +665,27 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                       protocol="TCP", port=80,
                                       target_port=8080, label=None,
                                       namespace="default", get_ip=True,
-                                      service_name=None, cleanup=True):
+                                      service_name=None, cleanup=True,
+                                      save=True):
+        """Precreate resources for service test (booting amphoras takes time).
+
+        :param pod_num: Number of pods
+        :param spec_type: Service's spec.type
+        :param protocol: Listener protocol
+        :param port: Listener port
+        :param target_port: Port on members
+        :param label: Label to use on pods as {'app': label}
+        :param namespace: K8s namespace to use
+        :param get_ip: Should it save service_ip on the class?
+        :param service_name: Name of the Service
+        :param cleanup: Should it add service cleanup?
+        :param save: Should it save anything on the class? Useful for running
+                     in a single test.
+        :return: Tuple with (<name of service>, <list of service pod names>)
+        """
 
         label = label or data_utils.rand_name('kuryr-app')
+        svc_pods = []
         for i in range(pod_num):
             if protocol == "SCTP":
                 pod_name, pod = cls.create_pod(
@@ -676,25 +694,29 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             else:
                 pod_name, pod = cls.create_pod(
                     labels={"app": label}, namespace=namespace)
+            svc_pods.append(pod_name)
             if cleanup:
                 cls.addClassResourceCleanup(cls.delete_pod, pod_name,
                                             namespace=namespace)
-        cls.pod_num = pod_num
+        if save:
+            cls.pod_num = pod_num
         service_name, service_obj = cls.create_service(
             pod_label=pod.metadata.labels, spec_type=spec_type,
             protocol=protocol, port=port, target_port=target_port,
             namespace=namespace, service_name=service_name)
         if get_ip:
-            cls.service_ip = cls.get_service_ip(
-                service_name, spec_type=spec_type, namespace=namespace)
+            if save:
+                cls.service_name = service_name
+                cls.service_ip = cls.get_service_ip(
+                    service_name, spec_type=spec_type, namespace=namespace)
             # This is already waiting for endpoint annotations to be made by
             # Kuryr
             cls.verify_lbaas_endpoints_configured(service_name, pod_num,
                                                   namespace)
-            cls.service_name = service_name
         if cleanup:
             cls.addClassResourceCleanup(cls.delete_service, service_name,
                                         namespace=namespace)
+        return service_name, svc_pods
 
     @classmethod
     def service_without_selector_base(cls, pod_num=2,
@@ -1362,6 +1384,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                             labels=None,
                                             pod_num=None,
                                             pod_name=None,
+                                            service_name=None,
                                             cleanup=True):
         """Verify client pod to service connectivity
 
@@ -1370,11 +1393,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
         :param service_port - The port of the service we check
         :param protocol - The service protocol we check
-        :namespace - The namespace of the client pod
+        :param namespace - The namespace of the client pod
         :param labels - The labels of the client pod
         :param pod_num - The number of pods expected to serve the service
         :param pod_name - If supplied no pod will be created and instead a pod
                           with this name will be used
+        :param service_name - name of the service to test
         :param cleanup - Whether to add a cleanup function for the created pod
         :returns: The name of the client pod that was created or passed to
                   the function
@@ -1382,7 +1406,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         # FIXME(itzikb): Use the clusterIP to
         # check service status as there are some issues with the FIPs
         # and OVN gates
-        clusterip_svc_ip = self.get_service_ip(self.service_name,
+        service_name = service_name or self.service_name
+        clusterip_svc_ip = self.get_service_ip(service_name,
                                                spec_type='ClusterIP',
                                                namespace=namespace)
         pod_num = pod_num or self.pod_num
