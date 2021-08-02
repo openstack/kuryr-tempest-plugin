@@ -14,11 +14,14 @@
 import testtools
 import time
 
+import kubernetes
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib import decorators
+from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
+from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -239,3 +242,84 @@ class TestDeployment(base.BaseKuryrScenarioTest):
 
         self.scale_deployment(0, deployment_name)
         self.check_lb_members(pool_id, 0)
+
+
+class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
+
+    credentials = ['admin', 'primary', ['lb_admin', 'load-balancer_admin']]
+
+    @classmethod
+    def skip_checks(cls):
+        super(TestLoadBalancerReconciliationScenario, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
+        if not CONF.kuryr_kubernetes.enable_reconciliation:
+            raise cls.skipException("Reconciliation is not enabled")
+
+    @classmethod
+    def setup_clients(cls):
+        super(TestLoadBalancerReconciliationScenario, cls).setup_clients()
+        cls.lbaas = cls.os_roles_lb_admin.load_balancer_v2.LoadbalancerClient()
+
+    @decorators.idempotent_id('da9bd886-e895-4869-b356-228c92a4da7f')
+    def test_loadbalancers_reconcilation(self):
+        service_name = "kuryr-reconciliation-demo"
+        namespace = "default"
+        self.create_setup_for_service_test(service_name=service_name)
+        self.check_service_internal_connectivity(service_name=service_name)
+        # if there is a connectivity
+        LOG.info("Retrieving the LoadBalancer ID from KuryrLoadBalancer CRD")
+        try:
+            klb_crd_id = self.get_kuryr_loadbalancer_crds(service_name,
+                                                          namespace).get(
+                                                         'status',
+                                                         {}).get(
+                                                         'loadbalancer',
+                                                         {}).get('id')
+        except kubernetes.client.rest.ApiException:
+            raise lib_exc.ServerFault
+        # NOTE(digitalsimboja): We need to await for DELETE to
+        # complete on Octavia
+        self.lbaas.delete_loadbalancer(klb_crd_id, cascade=True)
+        LOG.debug("Waiting for loadbalancer to be completely gone")
+        start = time.time()
+        while time.time() - start < consts.LB_TIMEOUT:
+            try:
+                time.sleep(30)
+                self.lbaas.show_loadbalancer(klb_crd_id)
+            except lib_exc.NotFound:
+                LOG.debug("LoadBalancer sucessfully deleted")
+                break
+        else:
+            msg = ("Timed Out waiting for loadbalancer %s to be completely"
+                   " deleted", klb_crd_id)
+            raise lib_exc.TimeoutException(msg)
+        start = time.time()
+        timeout = consts.LB_RECONCILE_TIMEOUT + consts.LB_TIMEOUT
+        # We need to add both timeouts to wait for the time for both rebuilding
+        # and reconciliation of the LoadBalancer
+        while time.time() - start < timeout:
+            try:
+                time.sleep(60)
+                LOG.debug("Checking for LoadBalancers Reconciliation")
+                new_lb_id = self.get_kuryr_loadbalancer_crds(service_name,
+                                                             namespace).get(
+                                                             'status',
+                                                             {}).get(
+                                                             'loadbalancer',
+                                                             {}).get('id')
+                if new_lb_id == klb_crd_id or new_lb_id is None:
+                    continue
+                else:
+                    self.assertNotEqual(new_lb_id, klb_crd_id)
+                    break
+            except kubernetes.client.rest.ApiException:
+                continue
+        else:
+            msg = ('Timed out waiting for LoadBalancer %s reconciliation',
+                   klb_crd_id)
+            raise lib_exc.TimeoutException(msg)
+        # if there is a connectivity now, that means the LoadBalancer
+        # is reconciled
+        LOG.info("LoadBalancer successfully reconciled")
+        self.check_service_internal_connectivity(service_name=service_name)

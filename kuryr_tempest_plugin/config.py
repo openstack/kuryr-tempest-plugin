@@ -102,4 +102,7 @@ kuryr_k8s_opts = [
     cfg.IntOpt("lb_members_change_timeout", default=1200,
                help="The max time (in seconds) it should take to adjust the "
                " number LB members"),
+    cfg.BoolOpt("enable_reconciliation", default=False,
+                help="Whether or not reconciliation is enabled"),
+
 ]
