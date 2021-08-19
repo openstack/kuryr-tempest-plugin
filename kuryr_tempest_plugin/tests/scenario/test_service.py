@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import testtools
+import time
 
 from oslo_log import log as logging
 from tempest import config
@@ -67,10 +68,13 @@ class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
 
     @decorators.idempotent_id('bddf5441-1244-449d-a175-b5fdcfc2a1a9')
     def test_lb_service_http(self):
+        retries = 10
         self.check_service_internal_connectivity()
-
         LOG.info("Trying to curl the service IP %s" % self.service_ip)
-        self.assert_backend_amount(self.service_ip, self.pod_num)
+
+        for i in range(retries):
+            self.assert_backend_amount(self.service_ip, self.pod_num)
+            time.sleep(30)
 
     # TODO(yboaron): Use multi threads for 'test_vm_service_http' test
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1b5a9')
