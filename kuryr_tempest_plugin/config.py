@@ -99,4 +99,7 @@ kuryr_k8s_opts = [
     cfg.BoolOpt("test_configurable_listener_timeouts", default=False,
                 help="Whether or not listener timeout values are "
                 "configurable"),
+    cfg.IntOpt("lb_members_change_timeout", default=1200,
+               help="The max time (in seconds) it should take to adjust the "
+               " number LB members"),
 ]

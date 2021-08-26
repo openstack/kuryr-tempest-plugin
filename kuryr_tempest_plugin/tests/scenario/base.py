@@ -385,6 +385,42 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             if project_name == project['name']:
                 return project['id']
 
+    def create_deployment(self, deployment_name=None, api_version="apps/v1",
+                          kind="Deployment", namespace="default"):
+        api_instance = kubernetes.client.AppsV1Api()
+        if not deployment_name:
+            deployment_name = data_utils.rand_name(prefix='kuryr-deployment')
+        deployment = k8s_client.V1Deployment()
+        deployment.api_version = api_version
+        deployment.kind = kind
+        template = {"metadata": {"labels": {"app": "demo"}},
+                    "spec": {"containers": [
+                        {"image": "quay.io/kuryr/demo",
+                         "name": 'demo',
+                         "ports": [{"containerPort": 8080}]}]}}
+        spec = k8s_client.V1DeploymentSpec(
+            replicas=3,
+            selector={"matchLabels": {"app": "demo"}}, template=template)
+        deployment.spec = spec
+        deployment.metadata = k8s_client.V1ObjectMeta(name=deployment_name,
+                                                      namespace=namespace,
+                                                      labels={'app': 'demo'})
+        deployment_obj = api_instance.create_namespaced_deployment(
+            namespace=namespace, body=deployment)
+        self.addCleanup(self.delete_deployment,
+                        deployment_name,
+                        namespace=namespace)
+        return deployment_name, deployment_obj
+
+    @classmethod
+    def delete_deployment(cls, deployment_name, namespace="default"):
+        api_instance = kubernetes.client.AppsV1Api()
+        delete_options = cls.k8s_client.V1DeleteOptions()
+        api_instance.delete_namespaced_deployment(
+            name=deployment_name,
+            namespace=namespace,
+            body=delete_options)
+
     @classmethod
     def create_service(cls, pod_label, service_name=None, api_version="v1",
                        kind=None, protocol="TCP", port=80, target_port=8080,
@@ -1462,3 +1498,53 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 break
 
         self.assertEqual(annotated_values, lb_status_values)
+
+    def wait_for_status(self, timeout, delay, func,
+                        *kargs, **kwargs):
+        """A Waiter function
+
+           Calls a function and checks it's return value.
+           If the return value is True before the timeout the function
+           returns the result, otherwise an exception is raised
+
+           :param timeout: timeout in seconds
+           :param delay:   How much to wait between iterations
+           :param func:    The function to be called
+           :param *kargs:  List of args to be passed to the function
+           :param *kwargs: Dict of args to be passed to the function
+        """
+
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                result = func(*kargs, **kwargs)
+                if result:
+                    return result
+                time.sleep(delay)
+            except kubernetes.client.rest.ApiException:
+                continue
+        else:
+            raise lib_exc.TimeoutException("TimedOut waiting for %s"
+                                           "with args %s and kwargs %s"
+                                           " to be true" % (func,
+                                                            kargs,
+                                                            kwargs))
+
+    def get_klb_crd_id(self, service_name):
+        return self.get_kuryr_loadbalancer_crds(
+            service_name, 'default').get('status', {}).get(
+            'loadbalancer', {}).get('id', None)
+
+    @classmethod
+    def check_lb_members(cls, pool_id, expected_members):
+        num_members = 0
+        start = time.time()
+        timeout = CONF.kuryr_kubernetes.lb_members_change_timeout
+        while time.time() - start < timeout:
+            num_members = len(cls.member_client.list_members(pool_id))
+            if num_members == expected_members:
+                break
+        else:
+            raise lib_exc.TimeoutException("Expected num of members is %s but"
+                                           " actual is %s" % (expected_members,
+                                                              num_members))

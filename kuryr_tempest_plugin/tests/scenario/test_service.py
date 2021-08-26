@@ -178,3 +178,64 @@ class TestListenerTimeoutScenario(base.BaseKuryrScenarioTest):
 
         self.check_updated_listener_timeout(
             service_name="kuryr-listener-demo")
+
+
+class TestDeployment(base.BaseKuryrScenarioTest):
+    credentials = ['admin', 'primary', ['lb_admin', 'load-balancer_admin']]
+    @classmethod
+    def skip_checks(cls):
+        super(TestDeployment, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
+
+    @classmethod
+    def setup_clients(cls):
+        super(TestDeployment, cls).setup_clients()
+        cls.lbaas = cls.os_roles_lb_admin.load_balancer_v2.LoadbalancerClient()
+        cls.member_client = cls.os_admin.load_balancer_v2.MemberClient()
+        cls.pool_client = cls.os_roles_lb_admin.load_balancer_v2.PoolClient()
+
+    def scale_deployment(self, replicas, deployment, namespace='default'):
+        self.k8s_client.AppsV1Api().patch_namespaced_deployment(
+            deployment, namespace,
+            {'spec': {'replicas': replicas}})
+
+    @testtools.skipUnless(
+        CONF.kuryr_kubernetes.kuryrloadbalancers,
+        "kuryrloadbalancers CRDs should be used to run this test")
+    @decorators.idempotent_id('bbacc377-c861-4766-b123-133d8195ee50')
+    def test_deployment_scale(self):
+        """Deploys a deployment, rescales and check LB members
+
+           Deploys a deployment with 3 pods and deploys a service.
+           Checks the number of LB members , Scales to 5 and do the same,
+           and also checks connectivity to the service. Scales to 0 and
+           checks that the number LB memebers is also 0
+        """
+        timeout = CONF.kuryr_kubernetes.lb_build_timeout
+        deployment_name, _ = self.create_deployment()
+        service_name, _ = self.create_service(pod_label={"app": "demo"},
+                                              spec_type='ClusterIP')
+        service_ip = self.get_service_ip(service_name, spec_type='ClusterIP')
+        self.addCleanup(self.delete_service, service_name)
+
+        klb_crd_id = self.wait_for_status(timeout, 15, self.get_klb_crd_id,
+                                          service_name=service_name)
+
+        pool_query = "loadbalancer_id=%s" % klb_crd_id
+
+        self.wait_for_status(timeout, 15, self.lbaas.show_loadbalancer,
+                             klb_crd_id)
+        pool = self.wait_for_status(timeout, 15, self.pool_client.list_pools,
+                                    query_params=pool_query)
+        pool_id = pool[0].get('id')
+        self.check_lb_members(pool_id, 3)
+
+        self.scale_deployment(5, deployment_name)
+        pod_name, _ = self.create_pod()
+        self.addCleanup(self.delete_pod, pod_name)
+        self.assert_backend_amount_from_pod(service_ip, 5, pod_name)
+        self.check_lb_members(pool_id, 5)
+
+        self.scale_deployment(0, deployment_name)
+        self.check_lb_members(pool_id, 0)
