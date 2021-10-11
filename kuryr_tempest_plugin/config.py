@@ -104,5 +104,8 @@ kuryr_k8s_opts = [
                " number LB members"),
     cfg.BoolOpt("enable_reconciliation", default=False,
                 help="Whether or not reconciliation is enabled"),
+    cfg.BoolOpt("trigger_namespace_upon_pod", default=False,
+                help="Whether or not Namespace should be handled upon Pod "
+                "creation"),
 
 ]
