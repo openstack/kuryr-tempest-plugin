@@ -20,10 +20,15 @@
       - kuryr-kubernetes-tempest-jobs
     check:
       jobs:
+        - kuryr-kubernetes-tempest-xena
         - kuryr-kubernetes-tempest-wallaby
         - kuryr-kubernetes-tempest-victoria
         - kuryr-kubernetes-tempest-ussuri
-        - kuryr-kubernetes-tempest-train
+
+- job:
+    name: kuryr-kubernetes-tempest-xena
+    parent: kuryr-kubernetes-tempest
+    override-checkout: stable/xena
 
 - job:
     name: kuryr-kubernetes-tempest-wallaby
@@ -40,16 +45,3 @@
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/ussuri
     nodeset: openstack-single-node-bionic
-
-- job:
-    name: kuryr-kubernetes-tempest-train
-    parent: kuryr-kubernetes-tempest
-    override-checkout: stable/train
-    nodeset: openstack-single-node-bionic
-    required-projects:
-    - name: openstack/diskimage-builder
-      override-checkout: 2.30.0
-    vars:
-      devstack_localrc:
-        USE_PYTHON3: True
-    voting: false
