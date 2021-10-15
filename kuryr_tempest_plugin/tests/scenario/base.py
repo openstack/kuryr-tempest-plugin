@@ -1541,6 +1541,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         start = time.time()
         timeout = CONF.kuryr_kubernetes.lb_members_change_timeout
         while time.time() - start < timeout:
+            time.sleep(30)
             num_members = len(cls.member_client.list_members(pool_id))
             if num_members == expected_members:
                 break
