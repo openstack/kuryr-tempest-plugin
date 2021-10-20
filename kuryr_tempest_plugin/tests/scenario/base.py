@@ -198,6 +198,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return name, pod
 
     @classmethod
+    def delete_endpoint(cls, ep_name, body=None, namespace="default"):
+        if body is None:
+            body = {}
+        cls.k8s_client.CoreV1Api().delete_namespaced_endpoints(
+            name=ep_name,
+            body=body,
+            namespace=namespace)
+
+    @classmethod
     def delete_network_policy(cls, name, namespace='default'):
         body = cls.k8s_client.V1DeleteOptions()
         cls.k8s_client.NetworkingV1Api().delete_namespaced_network_policy(
@@ -804,6 +813,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                   protocol=protocol)])]
         cls.k8s_client.CoreV1Api().create_namespaced_endpoints(
             namespace=namespace, body=endpoint)
+        cls.endpoint = endpoint
         if get_ip:
             cls.service_ip = cls.get_service_ip(
                 service_name, spec_type=spec_type, namespace=namespace)

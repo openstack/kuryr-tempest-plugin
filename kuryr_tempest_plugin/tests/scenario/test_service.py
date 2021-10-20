@@ -128,6 +128,7 @@ class TestUdpServiceScenario(base.BaseKuryrScenarioTest):
 
 class TestServiceWithoutSelectorScenario(base.BaseKuryrScenarioTest):
 
+    credentials = ['admin', 'primary', ['lb_admin', 'load-balancer_admin']]
     @classmethod
     def skip_checks(cls):
         super(TestServiceWithoutSelectorScenario, cls).skip_checks()
@@ -135,14 +136,35 @@ class TestServiceWithoutSelectorScenario(base.BaseKuryrScenarioTest):
             raise cls.skipException("Service without selectors tests"
                                     " are not enabled")
 
+    @classmethod
+    def setup_clients(cls):
+        super(TestServiceWithoutSelectorScenario, cls).setup_clients()
+        cls.lbaas = cls.os_roles_lb_admin.load_balancer_v2.LoadbalancerClient()
+        cls.member_client = cls.os_admin.load_balancer_v2.MemberClient()
+        cls.pool_client = cls.os_roles_lb_admin.load_balancer_v2.PoolClient()
+
     @decorators.idempotent_id('bb8cc977-c867-4766-b623-133d8495ee50')
     def test_service_without_selector(self):
         # Create a service without selector
+        timeout = 300
         ns_name, ns_obj = self.create_namespace()
         self.addCleanup(self.delete_namespace, ns_name)
         self.service_without_selector_base(namespace=ns_name)
 
         self.check_service_internal_connectivity(namespace=ns_name)
+        klb_crd_id = self.wait_for_status(timeout, 15, self.get_klb_crd_id,
+                                          service_name=self.service_name,
+                                          svc_namespace=ns_name)
+
+        pool_query = "loadbalancer_id=%s" % klb_crd_id
+        pool = self.wait_for_status(timeout, 15, self.pool_client.list_pools,
+                                    query_params=pool_query)
+        pool_id = pool[0].get('id')
+
+        # Check that there no pool memebers after endpoint deletion
+        self.delete_endpoint(ep_name=self.endpoint.metadata.name,
+                             namespace=ns_name)
+        self.check_lb_members(pool_id, 0)
 
 
 class TestSCTPServiceScenario(base.BaseKuryrScenarioTest):
