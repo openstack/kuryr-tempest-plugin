@@ -389,7 +389,8 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         self.delete_namespace(ns_name)
         # wait for namespace to be deleted
-        retries = 120
+        # FIXME(itzikb) Set retries to 120 when BZ#1997120 is fixed
+        retries = 600
         while True:
             try:
                 time.sleep(1)
