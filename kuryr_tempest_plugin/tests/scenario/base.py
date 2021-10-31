@@ -58,6 +58,8 @@ OS_ROUTES_PLURAL = "routes"
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
+    credentials = ['admin', 'primary', ['lb_admin', 'load-balancer_admin']]
+
     @classmethod
     def skip_checks(cls):
         super(BaseKuryrScenarioTest, cls).skip_checks()
@@ -68,6 +70,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def setup_clients(cls):
         super(BaseKuryrScenarioTest, cls).setup_clients()
         cls.k8s_client = k8s_client
+        cls.lbaas = cls.os_roles_lb_admin.load_balancer_v2.LoadbalancerClient()
 
     @classmethod
     def resource_setup(cls):
@@ -1458,6 +1461,27 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             if cleanup:
                 self.addClassResourceCleanup(self.delete_pod, pod_name,
                                              namespace=namespace)
+
+        if CONF.kuryr_kubernetes.kuryrloadbalancers:
+            klb_crd_id = self.get_klb_crd_id(service_name, namespace)
+            start = time.time()
+            while time.time() - start < consts.LB_TIMEOUT:
+                try:
+                    lb_status = self.lbaas.get_loadbalancer_status(
+                        klb_crd_id)
+                except lib_exc.NotFound:
+                    break
+                else:
+                    loadbalancer = lb_status.get("loadbalancer", {})
+                    if loadbalancer.get("provisioning_status") == "ACTIVE":
+                        LOG.info("LB is ACTIVE: %s", klb_crd_id)
+                        break
+                    time.sleep(10)
+            else:
+                msg = ("Timed out waiting for loadbalancer %s to become"
+                       " ACTIVE", klb_crd_id)
+                raise lib_exc.TimeoutException(msg)
+
         self.assert_backend_amount_from_pod(
             clusterip_svc_ip,
             pod_num,
@@ -1530,9 +1554,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                                             kargs,
                                                             kwargs))
 
-    def get_klb_crd_id(self, service_name):
+    def get_klb_crd_id(self, service_name, svc_namespace='default'):
         return self.get_kuryr_loadbalancer_crds(
-            service_name, 'default').get('status', {}).get(
+            service_name, svc_namespace).get('status', {}).get(
             'loadbalancer', {}).get('id', None)
 
     @classmethod

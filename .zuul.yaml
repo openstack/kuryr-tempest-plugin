@@ -17,7 +17,6 @@
       - check-requirements
       - publish-openstack-docs-pti
       - tempest-plugin-jobs
-      - kuryr-kubernetes-tempest-jobs
     check:
       jobs:
         - kuryr-kubernetes-tempest-xena

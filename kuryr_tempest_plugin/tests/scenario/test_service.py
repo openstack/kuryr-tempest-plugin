@@ -265,7 +265,8 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
     def test_loadbalancers_reconcilation(self):
         service_name = "kuryr-reconciliation-demo"
         namespace = "default"
-        self.create_setup_for_service_test(service_name=service_name)
+        _, svc_pods = self.create_setup_for_service_test(
+            service_name=service_name)
         self.check_service_internal_connectivity(service_name=service_name)
         # if there is a connectivity
         LOG.info("Retrieving the LoadBalancer ID from KuryrLoadBalancer CRD")
@@ -302,16 +303,17 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
             try:
                 time.sleep(60)
                 LOG.debug("Checking for LoadBalancers Reconciliation")
-                new_lb_id = self.get_kuryr_loadbalancer_crds(service_name,
-                                                             namespace).get(
-                                                             'status',
-                                                             {}).get(
-                                                             'loadbalancer',
-                                                             {}).get('id')
-                if new_lb_id == klb_crd_id or new_lb_id is None:
+                status = self.get_kuryr_loadbalancer_crds(service_name,
+                                                          namespace).get(
+                                                          'status', {})
+                new_lb_id = status.get('loadbalancer', {}).get('id')
+                new_lb_members = status.get('members', [])
+                if (new_lb_id == klb_crd_id or new_lb_id is None or
+                        len(svc_pods) != len(new_lb_members)):
                     continue
                 else:
                     self.assertNotEqual(new_lb_id, klb_crd_id)
+                    self.assertEqual(len(svc_pods), len(new_lb_members))
                     break
             except kubernetes.client.rest.ApiException:
                 continue
@@ -319,7 +321,7 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
             msg = ('Timed out waiting for LoadBalancer %s reconciliation',
                    klb_crd_id)
             raise lib_exc.TimeoutException(msg)
+        LOG.info("LoadBalancer successfully reconciled")
         # if there is a connectivity now, that means the LoadBalancer
         # is reconciled
-        LOG.info("LoadBalancer successfully reconciled")
         self.check_service_internal_connectivity(service_name=service_name)
