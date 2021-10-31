@@ -161,7 +161,7 @@ class TestServiceWithoutSelectorScenario(base.BaseKuryrScenarioTest):
                                     query_params=pool_query)
         pool_id = pool[0].get('id')
 
-        # Check that there no pool memebers after endpoint deletion
+        # Check that there no pool members after endpoint deletion
         self.delete_endpoint(ep_name=self.endpoint.metadata.name,
                              namespace=ns_name)
         self.check_lb_members(pool_id, 0)
@@ -219,11 +219,6 @@ class TestDeployment(base.BaseKuryrScenarioTest):
         cls.lbaas = cls.os_roles_lb_admin.load_balancer_v2.LoadbalancerClient()
         cls.member_client = cls.os_admin.load_balancer_v2.MemberClient()
         cls.pool_client = cls.os_roles_lb_admin.load_balancer_v2.PoolClient()
-
-    def scale_deployment(self, replicas, deployment, namespace='default'):
-        self.k8s_client.AppsV1Api().patch_namespaced_deployment(
-            deployment, namespace,
-            {'spec': {'replicas': replicas}})
 
     @testtools.skipUnless(
         CONF.kuryr_kubernetes.kuryrloadbalancers,

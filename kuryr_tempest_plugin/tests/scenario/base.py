@@ -283,6 +283,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     return condition.status
 
     @classmethod
+    def get_pods_ready_num(cls, namespace="default",
+                           label="", num_pods=1):
+        pods = cls.get_pod_name_list(namespace=namespace,
+                                     label_selector=label)
+        ready_pods = sum([bool(cls.get_readiness_state(p)) for p in pods])
+        return (num_pods == ready_pods)
+
+    @classmethod
     def get_pod_readiness(cls, pod_name, namespace="default",
                           container_name=None):
         LOG.info("Checking if pod {} is ready".format(pod_name))
@@ -398,14 +406,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 return project['id']
 
     def create_deployment(self, deployment_name=None, api_version="apps/v1",
-                          kind="Deployment", namespace="default"):
+                          kind="Deployment", namespace="default",
+                          labels={"app": "demo"}):
         api_instance = kubernetes.client.AppsV1Api()
         if not deployment_name:
             deployment_name = data_utils.rand_name(prefix='kuryr-deployment')
         deployment = k8s_client.V1Deployment()
         deployment.api_version = api_version
         deployment.kind = kind
-        template = {"metadata": {"labels": {"app": "demo"}},
+        template = {"metadata": {"labels": labels},
                     "spec": {"containers": [
                         {"image": "quay.io/kuryr/demo",
                          "name": 'demo',
@@ -423,6 +432,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                         deployment_name,
                         namespace=namespace)
         return deployment_name, deployment_obj
+
+    def scale_deployment(self, replicas, deployment, namespace='default',
+                         label='app=demo'):
+        self.k8s_client.AppsV1Api().patch_namespaced_deployment(
+            deployment, namespace,
+            {'spec': {'replicas': replicas}})
+        self.wait_for_status(180, 15, self.get_pods_ready_num,
+                             namespace=namespace, label=label,
+                             num_pods=replicas)
 
     @classmethod
     def delete_deployment(cls, deployment_name, namespace="default"):
@@ -942,25 +960,29 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             namespace=namespace, plural=KURYR_LOAD_BALANCER_CRD_PLURAL,
             name=name)
 
-    def get_pod_list(self, namespace='default', label_selector=''):
-        return self.k8s_client.CoreV1Api().list_namespaced_pod(
+    @classmethod
+    def get_pod_list(cls, namespace='default', label_selector=''):
+        return cls.k8s_client.CoreV1Api().list_namespaced_pod(
             namespace=namespace, label_selector=label_selector).items
 
-    def get_pod_name_list(self, namespace='default', label_selector=''):
-        return [pod.metadata.name for pod in self.get_pod_list(
+    @classmethod
+    def get_pod_name_list(cls, namespace='default', label_selector=''):
+        return [pod.metadata.name for pod in cls.get_pod_list(
             namespace=namespace, label_selector=label_selector)]
 
-    def get_pod_ip_list(self, namespace='default', label_selector=''):
-        return [pod.status.pod_ip for pod in self.get_pod_list(
+    @classmethod
+    def get_pod_ip_list(cls, namespace='default', label_selector=''):
+        return [pod.status.pod_ip for pod in cls.get_pod_list(
             namespace=namespace, label_selector=label_selector)]
 
-    def get_controller_pod_names(self):
+    @classmethod
+    def get_controller_pod_names(cls):
         controller_label = CONF.kuryr_kubernetes.controller_label
-        controller_pod_names = self.get_pod_name_list(
+        controller_pod_names = cls.get_pod_name_list(
             namespace=CONF.kuryr_kubernetes.kube_system_namespace,
             label_selector=controller_label)
-        self.assertNotEmpty(controller_pod_names, "Can't find controller pods "
-                            "with label %s" % controller_label)
+        cls.assertTrue(controller_pod_names, "Can't find controller pods "
+                       "with label %s" % controller_label)
         return controller_pod_names
 
     def _run_and_assert_fn(self, fn, repeats=10, responses_num=2):
