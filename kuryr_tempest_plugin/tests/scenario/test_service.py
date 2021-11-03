@@ -237,8 +237,8 @@ class TestDeployment(base.BaseKuryrScenarioTest):
         self.scale_deployment(5, deployment_name)
         pod_name, _ = self.create_pod()
         self.addCleanup(self.delete_pod, pod_name)
-        self.assert_backend_amount_from_pod(service_ip, 5, pod_name)
         self.check_lb_members(pool_id, 5)
+        self.assert_backend_amount_from_pod(service_ip, 5, pod_name)
 
         self.scale_deployment(0, deployment_name)
         self.check_lb_members(pool_id, 0)
