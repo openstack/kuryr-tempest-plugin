@@ -55,6 +55,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         self.assertIn(namespace_name, existing_namespaces)
 
+        pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
+                                        namespace=namespace_name)
+
         subnet_name = 'ns/' + namespace_name + '-subnet'
         kuryr_net_crd_name = 'ns-' + namespace_name
 
@@ -82,8 +85,6 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
             self.assertIn(kuryr_net_crd['spec']['netId'], net_id)
 
         # Check namespace pod connectivity
-        pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
-                                        namespace=namespace_name)
         self.create_setup_for_service_test(namespace=namespace_name,
                                            cleanup=False)
         self.check_service_internal_connectivity(namespace=namespace_name,

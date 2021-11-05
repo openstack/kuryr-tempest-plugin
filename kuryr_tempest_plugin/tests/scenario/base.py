@@ -830,6 +830,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def create_namespace(cls, name=None, labels=None,
                          wait_for_crd=True,
                          timeout_period=consts.NS_TIMEOUT):
+        if CONF.kuryr_kubernetes.trigger_namespace_upon_pod:
+            wait_for_crd = False
         if not name:
             name = data_utils.rand_name(prefix='kuryr-namespace')
         namespace = cls.k8s_client.V1Namespace()

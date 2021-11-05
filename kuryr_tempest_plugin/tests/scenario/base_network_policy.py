@@ -148,6 +148,9 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
     def test_ipblock_network_policy_allow_except(self):
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
+        pod_name, pod = self.create_pod(namespace=namespace_name)
+        self.addCleanup(self.delete_pod, pod_name, pod,
+                        namespace=namespace_name)
 
         if CONF.kuryr_kubernetes.kuryrnetworks:
             cidr = self.get_kuryr_network_crds(
