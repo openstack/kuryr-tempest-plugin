@@ -1598,3 +1598,75 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             for container in pod.status.container_statuses:
                 containers[pod_name][container.name] = container.restart_count
         return containers
+
+
+class BaseReconciliationScenarioTest(BaseKuryrScenarioTest):
+
+    credentials = ['admin', 'primary', ['lb_admin', 'load-balancer_admin']]
+
+    @classmethod
+    def skip_checks(cls):
+        super(BaseReconciliationScenarioTest, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
+        if not CONF.kuryr_kubernetes.enable_reconciliation:
+            raise cls.skipException("Reconciliation is not enabled")
+
+    @classmethod
+    def setup_clients(cls):
+        super(BaseReconciliationScenarioTest, cls).setup_clients()
+        cls.lbaas = cls.os_roles_lb_admin.load_balancer_v2.LoadbalancerClient()
+        cls.lsnr = cls.os_roles_lb_admin.load_balancer_v2.ListenerClient()
+
+    def check_for_resource_reconciliation(self, service_name, svc_pods,
+                                          resource, resource_id,
+                                          show_resource, namespace='default'):
+        LOG.debug("Waiting for %s to be completely gone", resource)
+        start = time.time()
+        while time.time() - start < consts.LB_TIMEOUT:
+            try:
+                time.sleep(30)
+                show_resource(resource_id)
+            except lib_exc.NotFound:
+                LOG.debug("%s sucessfully deleted", resource)
+                break
+        else:
+            msg = ("Timed Out waiting for  %s to be completely"
+                   " deleted", resource_id)
+            raise lib_exc.TimeoutException(msg)
+        start = time.time()
+        timeout = consts.LB_RECONCILE_TIMEOUT + consts.LB_TIMEOUT
+        # (digitalsimboja) We need to add both timeouts to wait for the time
+        # for both rebuilding and reconciliation of the KuryrLoadBalancer CRD
+        while time.time() - start < timeout:
+            try:
+                time.sleep(60)
+                LOG.debug("Checking for %s Reconciliation", resource)
+                status = self.get_kuryr_loadbalancer_crds(service_name,
+                                                          namespace).get(
+                                                          'status', {})
+                if resource == consts.LISTENER:
+                    listeners = status.get(resource, [])
+                    if not listeners:
+                        continue
+                    new_resource_id = listeners[0].get('id')
+                else:
+                    new_resource_id = status.get(resource, {}).get('id')
+                new_lb_members = status.get('members', [])
+                if (new_resource_id == resource_id or new_resource_id is None
+                        or len(svc_pods) != len(new_lb_members)):
+                    continue
+                else:
+                    self.assertNotEqual(new_resource_id, resource_id)
+                    self.assertEqual(len(svc_pods), len(new_lb_members))
+                    break
+            except kubernetes.client.rest.ApiException:
+                continue
+        else:
+            msg = ('Timed out waiting for the %s reconciliation', resource)
+            raise lib_exc.TimeoutException(msg)
+        LOG.info("%s successfully reconciled", resource)
+        # if there is a connectivity now, that means the KuryrLoadBalancer CRD
+        # resource is reconciled
+        self.check_service_internal_connectivity(service_name=service_name,
+                                                 namespace=namespace)

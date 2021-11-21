@@ -107,6 +107,8 @@ kuryr_k8s_opts = [
                " number LB members"),
     cfg.BoolOpt("enable_reconciliation", default=False,
                 help="Whether or not reconciliation is enabled"),
+    cfg.BoolOpt("enable_listener_reconciliation", default=False,
+                help="Whether or not listener reconciliation is enabled"),
     cfg.IntOpt("lb_reconcile_timeout", default=600,
                help="The max time (in seconds) it should take for LB "
                "reconciliation. It doesn't include the LB build time."),
