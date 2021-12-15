@@ -526,7 +526,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def get_svc_ip_on_annotation(cls, service_name, namespace):
         api = cls.k8s_client.CoreV1Api()
         start = time.time()
-        while time.time() - start < consts.LB_TIMEOUT:
+        while time.time() - start < CONF.kuryr_kubernetes.lb_build_timeout:
             time.sleep(5)
             service = api.read_namespaced_service(service_name, namespace)
             if service.status.load_balancer.ingress:
@@ -561,7 +561,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def get_svc_ip_on_crd(cls, service_name, namespace):
         api = cls.k8s_client.CoreV1Api()
         start = time.time()
-        while time.time() - start < consts.LB_TIMEOUT:
+        while time.time() - start < CONF.kuryr_kubernetes.lb_build_timeout:
             time.sleep(5)
             service = api.read_namespaced_service(service_name, namespace)
             if service.status.load_balancer.ingress:
@@ -1153,7 +1153,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def _verify_klb_crd(cls, name, poll_interval=1, namespace='default',
-                        timeout_period=consts.LB_TIMEOUT, pod_num=None):
+                        timeout_period=CONF.kuryr_kubernetes.lb_build_timeout,
+                        pod_num=None):
         start = time.time()
         klb_crd_has_status = False
         while time.time() - start < timeout_period:
@@ -1177,10 +1178,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             raise lib_exc.TimeoutException(msg)
 
     @classmethod
-    def _verify_endpoints_annotation(cls, ep_name, ann_string,
-                                     poll_interval=1, namespace='default',
-                                     pod_num=None,
-                                     timeout_period=consts.LB_TIMEOUT):
+    def _verify_endpoints_annotation(
+            cls, ep_name, ann_string, poll_interval=1, namespace='default',
+            pod_num=None,
+            timeout_period=CONF.kuryr_kubernetes.lb_build_timeout):
         LOG.info("Look for %s string in ep=%s annotation ",
                  ann_string, ep_name)
 
@@ -1503,7 +1504,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         if CONF.kuryr_kubernetes.kuryrloadbalancers:
             klb_crd_id = self.get_klb_crd_id(service_name, namespace)
             start = time.time()
-            while time.time() - start < consts.LB_TIMEOUT:
+            while time.time() - start < CONF.kuryr_kubernetes.lb_build_timeout:
                 try:
                     lb_status = self.lbaas.get_loadbalancer_status(
                         klb_crd_id)
@@ -1549,7 +1550,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                               namespace=namespace)
         annotated_values = [value for i, value in annotation.items()]
         start = time.time()
-        while time.time() - start < consts.LB_TIMEOUT:
+        while time.time() - start < CONF.kuryr_kubernetes.lb_build_timeout:
             time.sleep(5)
             timeout_cli, timeout_mem = self.get_listener_timeout_on_crd(
                 service_name=updated_service.metadata.name,

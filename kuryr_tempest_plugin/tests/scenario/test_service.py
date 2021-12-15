@@ -21,7 +21,6 @@ from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
-from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -301,7 +300,7 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
         self.lbaas.delete_loadbalancer(klb_crd_id, cascade=True)
         LOG.debug("Waiting for loadbalancer to be completely gone")
         start = time.time()
-        while time.time() - start < consts.LB_TIMEOUT:
+        while time.time() - start < CONF.kuryr_kubernetes.lb_build_timeout:
             try:
                 time.sleep(30)
                 self.lbaas.show_loadbalancer(klb_crd_id)
@@ -313,7 +312,8 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
                    " deleted", klb_crd_id)
             raise lib_exc.TimeoutException(msg)
         start = time.time()
-        timeout = consts.LB_RECONCILE_TIMEOUT + consts.LB_TIMEOUT
+        timeout = CONF.kuryr_kubernetes.lb_reconcile_timeout + \
+            CONF.kuryr_kubernetes.lb_build_timeout
         # We need to add both timeouts to wait for the time for both rebuilding
         # and reconciliation of the LoadBalancer
         while time.time() - start < timeout:
