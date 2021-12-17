@@ -291,11 +291,9 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return (num_pods == ready_pods)
 
     @classmethod
-    def get_pod_readiness(cls, pod_name, namespace="default",
-                          container_name=None):
+    def get_pod_readiness(cls, pod_name, namespace="default"):
         LOG.info("Checking if pod {} is ready".format(pod_name))
-        return cls.get_readiness_state(pod_name, namespace=namespace,
-                                       container_name=container_name)
+        return cls.get_readiness_state(pod_name, namespace=namespace)
 
     @classmethod
     def get_container_readiness(cls, pod_name, namespace="default",
@@ -1420,7 +1418,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             # Wait until kuryr-controller pools are reloaded, i.e.,
             # kuryr-controller is ready
             res = test_utils.call_until_true(
-                self.get_pod_readiness, 60, 1, kuryr_pod_name,
+                self.get_container_readiness, 60, 1, kuryr_pod_name,
                 namespace=system_namespace, container_name='controller')
             self.assertTrue(res, 'Timed out waiting for '
                                  'kuryr-controller to reload pools.')
