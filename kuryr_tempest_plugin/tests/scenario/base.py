@@ -817,6 +817,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         endpoint = cls.k8s_client.V1Endpoints()
         endpoint.metadata = cls.k8s_client.V1ObjectMeta(name=service_name)
         # EndpointSubset is a group of addresses with a set of ports
+        try:
+            ports = [cls.k8s_client.V1EndpointPort(
+                name=port_name, port=target_port, protocol=protocol)]
+        except AttributeError:
+            # FIXME(dulek): kubernetes==21.7.0 renamed V1EndpointPort to
+            # CoreV1EndpointPort, probably mistakenly. Bugreport:
+            # https://github.com/kubernetes-client/python/issues/1661
+            ports = [cls.k8s_client.CoreV1EndpointPort(
+                name=port_name, port=target_port, protocol=protocol)]
         endpoint.subsets = [cls.k8s_client.V1EndpointSubset(
                             addresses=[
                                 cls.k8s_client.V1EndpointAddress(
@@ -825,10 +834,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                     ip=pod_2_ip
                                 )
                             ],
-                            ports=[cls.k8s_client.V1EndpointPort(
-                                  name=port_name,
-                                  port=target_port,
-                                  protocol=protocol)])]
+                            ports=ports)]
         cls.k8s_client.CoreV1Api().create_namespaced_endpoints(
             namespace=namespace, body=endpoint)
         cls.endpoint = endpoint

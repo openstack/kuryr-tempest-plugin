@@ -250,24 +250,41 @@ class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
         endpoint = self.k8s_client.V1Endpoints()
         endpoint.metadata = self.k8s_client.V1ObjectMeta(name=service_name)
         addresses = [self.k8s_client.V1EndpointAddress(ip=server_pod_addr)]
+        try:
+            ports = [self.k8s_client.V1EndpointPort(
+                name=None, port=8080, protocol='TCP')]
+        except AttributeError:
+            # FIXME(dulek): kubernetes==21.7.0 renamed V1EndpointPort to
+            # CoreV1EndpointPort, probably mistakenly. Bugreport:
+            # https://github.com/kubernetes-client/python/issues/1661
+            ports = [self.k8s_client.CoreV1EndpointPort(
+                name=None, port=8080, protocol='TCP')]
         endpoint.subsets = [self.k8s_client.V1EndpointSubset(
                             addresses=addresses,
-                            ports=[self.k8s_client.V1EndpointPort(
-                                  name=None, port=8080, protocol='TCP')])]
+                            ports=ports)]
         self.k8s_client.CoreV1Api().create_namespaced_endpoints(
             namespace=server_ns_name, body=endpoint)
 
         # create another service
         service2_name, _ = self.create_service(namespace=server_ns_name,
                                                pod_label=None)
+
         # manually create endpoint for the service
         endpoint = self.k8s_client.V1Endpoints()
         endpoint.metadata = self.k8s_client.V1ObjectMeta(name=service2_name)
         addresses = [self.k8s_client.V1EndpointAddress(ip=server2_pod_addr)]
+        try:
+            ports = [self.k8s_client.V1EndpointPort(
+                name=None, port=8080, protocol='TCP')]
+        except AttributeError:
+            # FIXME(dulek): kubernetes==21.7.0 renamed V1EndpointPort to
+            # CoreV1EndpointPort, probably mistakenly. Bugreport:
+            # https://github.com/kubernetes-client/python/issues/1661
+            ports = [self.k8s_client.CoreV1EndpointPort(
+                name=None, port=8080, protocol='TCP')]
         endpoint.subsets = [self.k8s_client.V1EndpointSubset(
                             addresses=addresses,
-                            ports=[self.k8s_client.V1EndpointPort(
-                                  name=None, port=8080, protocol='TCP')])]
+                            ports=ports)]
         self.k8s_client.CoreV1Api().create_namespaced_endpoints(
             namespace=server_ns_name, body=endpoint)
 
