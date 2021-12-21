@@ -284,12 +284,20 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return False
 
     @classmethod
-    def get_pods_ready_num(cls, namespace="default",
-                           label="", num_pods=1):
+    def check_pods_ready_num(cls, namespace="default",
+                             label="", num_pods=1):
         pods = cls.get_pod_name_list(namespace=namespace,
                                      label_selector=label)
         ready_pods = sum([cls.get_readiness_state(p) for p in pods])
         return (num_pods == ready_pods)
+
+    @classmethod
+    def check_pods_status_num(cls, namespace="default", label="", num_pods=1,
+                              status="Running"):
+        pods = cls.get_pod_name_list(namespace=namespace,
+                                     label_selector=label)
+        status_pods = sum([cls.get_pod_status(p) == status for p in pods])
+        return (num_pods == status_pods)
 
     @classmethod
     def get_pod_readiness(cls, pod_name, namespace="default"):
@@ -406,7 +414,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     def create_deployment(self, deployment_name=None, api_version="apps/v1",
                           kind="Deployment", namespace="default",
-                          labels={"app": "demo"}):
+                          labels={"app": "demo"}, failing_probe=False):
         api_instance = kubernetes.client.AppsV1Api()
         if not deployment_name:
             deployment_name = data_utils.rand_name(prefix='kuryr-deployment')
@@ -418,6 +426,12 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                         {"image": "quay.io/kuryr/demo",
                          "name": 'demo',
                          "ports": [{"containerPort": 8080}]}]}}
+        if failing_probe:
+            for container in template["spec"]["containers"]:
+                container["readinessProbe"] = {"httpGet": {"path": "/healthz",
+                                                           "port": 8089},
+                                               "initialDelaySeconds": 2,
+                                               "timeoutSeconds": 1}
         spec = k8s_client.V1DeploymentSpec(
             replicas=3,
             selector={"matchLabels": {"app": "demo"}}, template=template)
@@ -440,7 +454,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         # NOTE(juriarte): Wait timeout increased from 180 to 300 in order to
         # give the pods time to transition to ready status in the gates (and
         # slow environments).
-        self.wait_for_status(300, 15, self.get_pods_ready_num,
+        self.wait_for_status(300, 15, self.check_pods_ready_num,
                              namespace=namespace, label=label,
                              num_pods=replicas)
 
@@ -1622,3 +1636,14 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             raise lib_exc.TimeoutException("Expected num of members is %s but"
                                            " actual is %s" % (expected_members,
                                                               num_members))
+
+    @classmethod
+    def get_pod_containers_restarts(cls, pod_names, namespace='default'):
+        containers = {}
+        for pod_name in pod_names:
+            containers[pod_name] = {}
+            pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
+                                                                 namespace)
+            for container in pod.status.container_statuses:
+                containers[pod_name][container.name] = container.restart_count
+        return containers
