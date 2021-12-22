@@ -1046,7 +1046,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             LOG.info("Unsupported protocol %s, returning", protocol)
             return
 
-        self._run_and_assert(req, pred)
+        self._run_and_assert(
+            req, pred, retry_repetitions=consts.REPETITIONS_PER_BACKEND*amount)
 
     def assert_backend_amount_from_pod(self, server_ip, amount, pod,
                                        server_port=None,
@@ -1137,9 +1138,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         else:
             LOG.info("Unsupported protocol %s, returning", protocol)
             return
-        self._run_and_assert(req, pred)
+        self._run_and_assert(
+            req, pred, retry_repetitions=consts.REPETITIONS_PER_BACKEND*amount)
 
-    def _run_and_assert(self, fn, predicate, retry_repetitions=100):
+    def _run_and_assert(self, fn, predicate, retry_repetitions=20):
         resps = [fn() for _ in range(retry_repetitions)]
         predicate(self, resps)
 
@@ -1351,7 +1353,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                                    'Incorrect amount of unique backends. '
                                    'Got {}'.format(unique_resps))
 
-        self._run_and_assert(req, pred)
+        self._run_and_assert(
+            req, pred, retry_repetitions=consts.REPETITIONS_PER_BACKEND*amount)
 
     def create_and_ping_pod(self):
         name, pod = self.create_pod()
