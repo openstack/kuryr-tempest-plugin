@@ -91,15 +91,18 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
     def test_port_pool(self):
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        subnet_id = self.get_subnet_id_for_ns(namespace_name)
-        pool_batch = self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch']
-        port_list_num = self.check_initial_ports_num(subnet_id,
-                                                     namespace_name,
-                                                     pool_batch)
 
-        # create a pod to test the port pool increase
-        pod_name1, _ = self.create_pod(namespace=namespace_name,
-                                       labels={'type': 'demo'})
+        pool_batch = self.PORTS_POOL_DEFAULT_DICT['ports_pool_batch']
+        if CONF.kuryr_kubernetes.trigger_namespace_upon_pod:
+            port_list_num = 1
+            pod_name1, _ = self.create_pod(namespace=namespace_name,
+                                           labels={'type': 'demo'})
+            subnet_id = self.get_subnet_id_for_ns(namespace_name)
+        else:
+            subnet_id = self.get_subnet_id_for_ns(namespace_name)
+            port_list_num = self.check_initial_ports_num(subnet_id,
+                                                         namespace_name,
+                                                         pool_batch)
 
         # port number should increase by ports_pool_batch value
         updated_port_list_num = len(self.os_admin.ports_client.list_ports(
