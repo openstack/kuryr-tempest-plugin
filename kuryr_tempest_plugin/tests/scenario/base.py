@@ -271,7 +271,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             pod = cls.k8s_client.CoreV1Api().read_namespaced_pod(pod_name,
                                                                  namespace)
         except kubernetes.client.rest.ApiException:
-            return None
+            return False
 
         if container_name:
             for container in pod.status.container_statuses:
@@ -280,14 +280,15 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         else:
             for condition in pod.status.conditions:
                 if condition.type == 'Ready':
-                    return condition.status
+                    return condition.status == 'True'
+        return False
 
     @classmethod
     def get_pods_ready_num(cls, namespace="default",
                            label="", num_pods=1):
         pods = cls.get_pod_name_list(namespace=namespace,
                                      label_selector=label)
-        ready_pods = sum([bool(cls.get_readiness_state(p)) for p in pods])
+        ready_pods = sum([cls.get_readiness_state(p) for p in pods])
         return (num_pods == ready_pods)
 
     @classmethod
@@ -436,7 +437,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         self.k8s_client.AppsV1Api().patch_namespaced_deployment(
             deployment, namespace,
             {'spec': {'replicas': replicas}})
-        self.wait_for_status(180, 15, self.get_pods_ready_num,
+        # NOTE(juriarte): Wait timeout increased from 180 to 300 in order to
+        # give the pods time to transition to ready status in the gates (and
+        # slow environments).
+        self.wait_for_status(300, 15, self.get_pods_ready_num,
                              namespace=namespace, label=label,
                              num_pods=replicas)
 
