@@ -104,6 +104,9 @@ kuryr_k8s_opts = [
                " number LB members"),
     cfg.BoolOpt("enable_reconciliation", default=False,
                 help="Whether or not reconciliation is enabled"),
+    cfg.IntOpt("lb_reconcile_timeout", default=600,
+               help="The max time (in seconds) it should take for LB "
+               "reconciliation. It doesn't include the LB build time."),
     cfg.BoolOpt("trigger_namespace_upon_pod", default=False,
                 help="Whether or not Namespace should be handled upon Pod "
                 "creation"),
