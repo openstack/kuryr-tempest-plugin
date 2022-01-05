@@ -1257,7 +1257,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         while retry_attempts != 0:
             time.sleep(time_between_attempts)
             for controller_pod in self.get_controller_pod_names():
-                self.assertEqual("Running", self.get_pod_status(
+                self.assertEqual(status, self.get_pod_status(
                     controller_pod,
                     CONF.kuryr_kubernetes.kube_system_namespace),
                     'Kuryr controller is not in the %s state' % status
