@@ -1505,6 +1505,18 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 self.addClassResourceCleanup(self.delete_pod, pod_name,
                                              namespace=namespace)
 
+        self.wait_until_service_LB_is_active(service_name, namespace)
+        self.assert_backend_amount_from_pod(
+            clusterip_svc_ip,
+            pod_num,
+            pod_name,
+            service_port,
+            protocol,
+            namespace_name=namespace)
+        return pod_name
+
+    def wait_until_service_LB_is_active(self, service_name,
+                                        namespace='default', poll_interval=5):
         if CONF.kuryr_kubernetes.kuryrloadbalancers:
             klb_crd_id = self.get_klb_crd_id(service_name, namespace)
             start = time.time()
@@ -1519,20 +1531,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     if loadbalancer.get("provisioning_status") == "ACTIVE":
                         LOG.info("LB is ACTIVE: %s", klb_crd_id)
                         break
-                    time.sleep(10)
+                    time.sleep(poll_interval)
             else:
                 msg = ("Timed out waiting for loadbalancer %s to become"
                        " ACTIVE", klb_crd_id)
                 raise lib_exc.TimeoutException(msg)
-
-        self.assert_backend_amount_from_pod(
-            clusterip_svc_ip,
-            pod_num,
-            pod_name,
-            service_port,
-            protocol,
-            namespace_name=namespace)
-        return pod_name
 
     def get_curl_template(self, ip_or_cidr, extra_args='', port=False):
         ipn = netaddr.IPNetwork(ip_or_cidr)
