@@ -20,3 +20,4 @@ POD_AFFINITY = {'requiredDuringSchedulingIgnoredDuringExecution': [
 TIME_TO_APPLY_SGS = 30
 POD_STATUS_RETRIES = 240
 NS_TIMEOUT = 600
+REPETITIONS_PER_BACKEND = 10
