@@ -96,6 +96,9 @@ kuryr_k8s_opts = [
     cfg.BoolOpt("test_services_without_selector", default=False,
                 help="Whether or not service without selector tests will be "
                 "running"),
+    cfg.BoolOpt("test_endpoints_object_removal", default=True,
+                help="Whether to check that LB members are deleted upon "
+                "endpoints object removal or not"),
     cfg.BoolOpt("test_configurable_listener_timeouts", default=False,
                 help="Whether or not listener timeout values are "
                 "configurable"),
