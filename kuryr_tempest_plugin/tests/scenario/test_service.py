@@ -17,6 +17,7 @@ import time
 import kubernetes
 from oslo_log import log as logging
 from tempest import config
+from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
@@ -39,16 +40,13 @@ class TestServiceScenario(base.BaseKuryrScenarioTest):
     @classmethod
     def resource_setup(cls):
         super(TestServiceScenario, cls).resource_setup()
-        cls.create_setup_for_service_test()
+        name = data_utils.rand_name(prefix='pod-service-curl')
+        cls.create_setup_for_service_test(service_name=name)
 
     @decorators.idempotent_id('bddf5441-1244-449d-a125-b5fdcfa1a7a9')
     def test_pod_service_curl(self):
-        pod_name, pod = self.create_pod()
-        self.addCleanup(self.delete_pod, pod_name)
-        self.assert_backend_amount_from_pod(
-            self.service_ip,
-            self.pod_num,
-            pod_name)
+        LOG.info("Trying to curl the service IP %s" % self.service_ip)
+        self.check_service_internal_connectivity()
 
 
 class TestLoadBalancerServiceScenario(base.BaseKuryrScenarioTest):
