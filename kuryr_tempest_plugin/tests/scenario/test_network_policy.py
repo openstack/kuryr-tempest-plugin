@@ -296,6 +296,8 @@ class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
         self.verify_lbaas_endpoints_configured(service_name, 1, server_ns_name)
         self.verify_lbaas_endpoints_configured(service2_name, 1,
                                                server_ns_name)
+        self.wait_until_service_LB_is_active(service_name, server_ns_name)
+        self.wait_until_service_LB_is_active(service2_name, server_ns_name)
 
         # check connectivity
         curl_tmpl = self.get_curl_template(service_ip, extra_args='-m 10')
@@ -303,10 +305,14 @@ class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
         cmd2 = ["/bin/sh", "-c", curl_tmpl.format(service2_ip)]
         self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(client_pod_name, cmd,
-                                               namespace=client_ns_name))
+                                               namespace=client_ns_name),
+                      "Connectivity from %s to service %s (%s) failed." %
+                      (client_pod_name, service_ip, service_name))
         self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(client_pod_name, cmd2,
-                                               namespace=client_ns_name))
+                                               namespace=client_ns_name),
+                      "Connectivity from %s to service2 %s (%s) failed." %
+                      (client_pod_name, service2_ip, service2_name))
 
         # create NP for client to be able to reach server
         np_name = data_utils.rand_name(prefix='kuryr-np')
