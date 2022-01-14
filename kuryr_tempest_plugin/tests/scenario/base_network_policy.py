@@ -66,8 +66,6 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
                               egress_cidrs_should_exist=(),
                               ingress_cidrs_shouldnt_exist=(),
                               egress_cidrs_shouldnt_exist=()):
-        ingress_cidrs_found = set()
-        egress_cidrs_found = set()
         ingress_cidrs_should_exist = set(ingress_cidrs_should_exist)
         egress_cidrs_should_exist = set(egress_cidrs_should_exist)
         ingress_cidrs_shouldnt_exist = set(ingress_cidrs_shouldnt_exist)
@@ -77,6 +75,8 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
 
         while not rules_match and (time.time() - start) < TIMEOUT_PERIOD:
+            ingress_cidrs_found = set()
+            egress_cidrs_found = set()
             sg_rules = self.get_sg_rules_for_np(namespace, np)
 
             for rule in sg_rules:
@@ -85,17 +85,18 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
                 elif rule['direction'] == 'egress':
                     egress_cidrs_found.add(rule['remote_ip_prefix'])
 
-                if (ingress_cidrs_should_exist.issubset(ingress_cidrs_found)
-                    and (not ingress_cidrs_shouldnt_exist
-                         or not ingress_cidrs_shouldnt_exist.issubset(
-                                ingress_cidrs_found))
-                    and egress_cidrs_should_exist.issubset(egress_cidrs_found)
-                    and (not egress_cidrs_shouldnt_exist
-                         or not egress_cidrs_shouldnt_exist.issubset(
-                                egress_cidrs_found))):
-                    rules_match = True
-                else:
-                    time.sleep(10)
+            if (ingress_cidrs_should_exist.issubset(ingress_cidrs_found)
+                and (not ingress_cidrs_shouldnt_exist
+                     or not ingress_cidrs_shouldnt_exist.issubset(
+                            ingress_cidrs_found))
+                and egress_cidrs_should_exist.issubset(egress_cidrs_found)
+                and (not egress_cidrs_shouldnt_exist
+                     or not egress_cidrs_shouldnt_exist.issubset(
+                            egress_cidrs_found))):
+                rules_match = True
+
+            time.sleep(1)
+
         if not rules_match:
             msg = 'Timed out waiting sg rules for np %s to match' % np
             raise lib_exc.TimeoutException(msg)
