@@ -307,7 +307,7 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
                 break
         else:
             msg = ("Timed Out waiting for loadbalancer %s to be completely"
-                   " deleted", klb_crd_id)
+                   " deleted" % klb_crd_id)
             raise lib_exc.TimeoutException(msg)
         start = time.time()
         timeout = CONF.kuryr_kubernetes.lb_reconcile_timeout + \
@@ -333,7 +333,7 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
             except kubernetes.client.rest.ApiException:
                 continue
         else:
-            msg = ('Timed out waiting for LoadBalancer %s reconciliation',
+            msg = ('Timed out waiting for LoadBalancer %s reconciliation' %
                    klb_crd_id)
             raise lib_exc.TimeoutException(msg)
         LOG.info("LoadBalancer successfully reconciled")
