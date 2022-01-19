@@ -898,9 +898,10 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
             return name, namespace_obj
 
-        start = time.time()
         if CONF.kuryr_kubernetes.kuryrnetworks:
+            start = time.time()
             # wait until kuryrnetwork CRD gets populated
+            kns_crd = {}
             while time.time() - start < timeout_period:
                 time.sleep(5)
                 try:
