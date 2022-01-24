@@ -21,6 +21,7 @@ from oslo_log import log as logging
 from tempest import config
 from tempest.lib.common.utils import data_utils
 from tempest.lib import decorators
+from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
 from kuryr_tempest_plugin.tests.scenario import base_network_policy as base_np
@@ -342,11 +343,17 @@ class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
         while time.time() - start < TIMEOUT_PERIOD:
             try:
                 time.sleep(1)
-                _, crd_pod_selector, _ = self.get_np_crd_info(np_name)
+                _, crd_pod_selector, _ = self.get_np_crd_info(np_name,
+                                                              client_ns_name)
                 if crd_pod_selector:
                     break
-            except kubernetes.client.rest.ApiException:
+            except kubernetes.client.rest.ApiException as e:
+                LOG.info("ApiException ocurred: %s" % e.body)
                 continue
+        else:
+            msg = "Timed out waiting for %s %s CRD pod selector" % (
+                np_name, KURYR_NETWORK_POLICY_CRD_PLURAL)
+            raise lib_exc.TimeoutException(msg)
 
         # after applying NP, we still should have an access from client to the
         # service with matched labels,
