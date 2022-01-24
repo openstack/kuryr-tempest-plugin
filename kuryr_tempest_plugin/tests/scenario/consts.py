@@ -19,5 +19,7 @@ POD_AFFINITY = {'requiredDuringSchedulingIgnoredDuringExecution': [
         'topologyKey': 'kubernetes.io/hostname'}]}
 TIME_TO_APPLY_SGS = 30
 POD_STATUS_RETRIES = 240
+POD_CHECK_TIMEOUT = 240
+POD_CHECK_SLEEP_TIME = 5
 NS_TIMEOUT = 600
 REPETITIONS_PER_BACKEND = 10

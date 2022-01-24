@@ -18,10 +18,12 @@ import kubernetes
 from oslo_log import log as logging
 from tempest import config
 from tempest.lib.common.utils import data_utils
+from tempest.lib.common.utils import test_utils
 from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
 from kuryr_tempest_plugin.tests.scenario import base
+from kuryr_tempest_plugin.tests.scenario import consts
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -341,3 +343,59 @@ class TestLoadBalancerReconciliationScenario(base.BaseKuryrScenarioTest):
         # if there is a connectivity now, that means the LoadBalancer
         # is reconciled
         self.check_service_internal_connectivity(service_name=service_name)
+
+
+class TestServiceWithNotReadyEndpoints(base.BaseKuryrScenarioTest):
+
+    @classmethod
+    def skip_checks(cls):
+        super(TestServiceWithNotReadyEndpoints, cls).skip_checks()
+        if not CONF.kuryr_kubernetes.service_tests_enabled:
+            raise cls.skipException("Service tests are not enabled")
+        if not CONF.kuryr_kubernetes.containerized:
+            raise cls.skipException("Only runs on containerized setups")
+
+    @decorators.idempotent_id('bddf5441-1244-450d-a125-b5fdcfa1a7b0')
+    def test_service_with_not_ready_endpoints(self):
+        # Create a deployment with a failing probe
+        deployment_name, _ = self.create_deployment(failing_probe=True)
+
+        # Wait until the deployment's pods are running
+        res = test_utils.call_until_true(
+            self.check_pods_status_num, consts.POD_CHECK_TIMEOUT*3,
+            consts.POD_CHECK_SLEEP_TIME, namespace='default', label='app=demo',
+            num_pods=3)
+        self.assertTrue(res, 'Timed out waiting for pods to be running')
+
+        # Wait until the pods are not ready
+        self.wait_for_status(
+            consts.POD_CHECK_TIMEOUT*3, consts.POD_CHECK_SLEEP_TIME,
+            self.check_pods_ready_num, namespace='default', label='app=demo',
+            num_pods=0)
+
+        # Get current Kuryr pods restart count (for a later comparison)
+        controller_pods = self.get_controller_pod_names()
+        container_restarts_before = self.get_pod_containers_restarts(
+            pod_names=controller_pods,
+            namespace=CONF.kuryr_kubernetes.kube_system_namespace)
+
+        # Create a service
+        service_name, _ = self.create_service(pod_label={"app": "demo"},
+                                              spec_type='ClusterIP')
+        self.addCleanup(self.delete_service, service_name)
+
+        # Check Kuryr pods are not restarted
+        self.check_controller_pod_status_for_time_period(
+            retry_attempts=10,
+            time_between_attempts=3)
+
+        # Get current Kuryr pods restart count
+        container_restarts_after = self.get_pod_containers_restarts(
+            pod_names=controller_pods,
+            namespace=CONF.kuryr_kubernetes.kube_system_namespace)
+
+        # Compare Kuryr pods restart count with previously stored data
+        self.assertEqual(container_restarts_before, container_restarts_after,
+                         "Kuryr controller pod(s) were restarted during the "
+                         "service creation, expected: %s, obtained: %s" %
+                         (container_restarts_before, container_restarts_after))
