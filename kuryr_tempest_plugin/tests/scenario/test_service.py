@@ -156,12 +156,13 @@ class TestServiceWithoutSelectorScenario(base.BaseKuryrScenarioTest):
         pool_query = "loadbalancer_id=%s" % klb_crd_id
         pool = self.wait_for_status(timeout, 15, self.pool_client.list_pools,
                                     query_params=pool_query)
-        pool_id = pool[0].get('id')
 
-        # Check that there no pool members after endpoint deletion
-        self.delete_endpoint(ep_name=self.endpoint.metadata.name,
-                             namespace=ns_name)
-        self.check_lb_members(pool_id, 0)
+        if CONF.kuryr_kubernetes.test_endpoints_object_removal:
+            # Check that there are no pool members after endpoint deletion
+            pool_id = pool[0].get('id')
+            self.delete_endpoint(ep_name=self.endpoint.metadata.name,
+                                 namespace=ns_name)
+            self.check_lb_members(pool_id, 0)
 
 
 class TestSCTPServiceScenario(base.BaseKuryrScenarioTest):
