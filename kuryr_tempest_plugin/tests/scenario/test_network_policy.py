@@ -342,10 +342,9 @@ class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
-                _, crd_pod_selector, _ = self.get_np_crd_info(np_name,
-                                                              client_ns_name)
-                if crd_pod_selector:
+                time.sleep(5)
+                _, _, ready = self.get_np_crd_info(np_name, client_ns_name)
+                if ready:
                     break
             except kubernetes.client.rest.ApiException as e:
                 LOG.info("ApiException ocurred: %s" % e.body)
@@ -354,6 +353,10 @@ class ServiceWOSelectorsNPScenario(base.BaseKuryrScenarioTest):
             msg = "Timed out waiting for %s %s CRD pod selector" % (
                 np_name, KURYR_NETWORK_POLICY_CRD_PLURAL)
             raise lib_exc.TimeoutException(msg)
+
+        # Even though the SG rules are up it might still take a moment until
+        # they're enforced.
+        time.sleep(10)
 
         # after applying NP, we still should have an access from client to the
         # service with matched labels,
