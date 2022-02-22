@@ -29,19 +29,23 @@
     name: kuryr-kubernetes-tempest-xena
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/xena
+    voting: false
 
 - job:
     name: kuryr-kubernetes-tempest-wallaby
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/wallaby
+    voting: false
 
 - job:
     name: kuryr-kubernetes-tempest-victoria
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/victoria
+    voting: false
 
 - job:
     name: kuryr-kubernetes-tempest-ussuri
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/ussuri
     nodeset: openstack-single-node-bionic
+    voting: false
