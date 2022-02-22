@@ -51,11 +51,11 @@ class TestKuryrRestartScenario(base.BaseKuryrScenarioTest):
                     namespace=CONF.kuryr_kubernetes.kube_system_namespace)
 
                 # make sure the kuryr pod was deleted
-                pod_delete_retries = 30
+                pod_delete_retries = 6
                 while self.get_pod_status(
                         kuryr_pod_name,
                         namespace=CONF.kuryr_kubernetes.kube_system_namespace):
-                    time.sleep(1)
+                    time.sleep(5)
                     pod_delete_retries -= 1
                     if pod_delete_retries == 0:
                         raise lib_exc.TimeoutException()

@@ -228,11 +228,11 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     @classmethod
     def wait_for_pod_status(cls, pod_name, namespace="default",
-                            pod_status=None, retries=30):
+                            pod_status=None, retries=6):
         while pod_status != cls.get_pod_status(
                 pod_name,
                 namespace=namespace):
-            time.sleep(1)
+            time.sleep(5)
             retries -= 1
             if retries == 0:
                 raise lib_exc.TimeoutException()
@@ -273,31 +273,33 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         except kubernetes.client.rest.ApiException:
             return False
 
+        return cls.get_readiness_state_from_pod(pod,
+                                                container_name=container_name)
+
+    @classmethod
+    def get_readiness_state_from_pod(cls, pod, container_name=None):
         if container_name:
             for container in pod.status.container_statuses:
                 if container.name == container_name:
                     return container.ready
-        else:
+        elif pod.status.conditions:
             for condition in pod.status.conditions:
                 if condition.type == 'Ready':
                     return condition.status == 'True'
         return False
 
     @classmethod
-    def check_pods_ready_num(cls, namespace="default",
-                             label="", num_pods=1):
-        pods = cls.get_pod_name_list(namespace=namespace,
-                                     label_selector=label)
-        ready_pods = sum([cls.get_readiness_state(p) for p in pods])
-        return (num_pods == ready_pods)
+    def check_pods_ready_num(cls, namespace="default", label="", num_pods=1):
+        pods = cls.get_pod_list(namespace=namespace, label_selector=label)
+        ready_pods = sum([cls.get_readiness_state_from_pod(p) for p in pods])
+        return num_pods == ready_pods
 
     @classmethod
     def check_pods_status_num(cls, namespace="default", label="", num_pods=1,
                               status="Running"):
-        pods = cls.get_pod_name_list(namespace=namespace,
-                                     label_selector=label)
-        status_pods = sum([cls.get_pod_status(p) == status for p in pods])
-        return (num_pods == status_pods)
+        pods = cls.get_pod_list(namespace=namespace, label_selector=label)
+        status_pods = sum([p.status.phase == status for p in pods])
+        return num_pods == status_pods
 
     @classmethod
     def get_pod_readiness(cls, pod_name, namespace="default"):
@@ -921,7 +923,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             kuryr_crd_annotation = K8S_ANNOTATION_PREFIX + "-net-crd"
             # wait until namespace gets created
             while True:
-                time.sleep(1)
+                time.sleep(10)
                 ns = cls.k8s_client.CoreV1Api().read_namespace_status(name)
                 if (ns.metadata.annotations and
                         ns.metadata.annotations.get(kuryr_crd_annotation)):

@@ -275,7 +275,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
-            time.sleep(1)
+            time.sleep(10)
             try:
                 if CONF.kuryr_kubernetes.kuryrnetworks:
                     self.get_kuryr_network_crds(namespace)
@@ -286,7 +286,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         # Also wait for the namespace removal
         while time.time() - start < TIMEOUT_PERIOD:
-            time.sleep(1)
+            time.sleep(10)
             try:
                 self.get_namespace(namespace)
             except kubernetes.client.rest.ApiException:
@@ -390,11 +390,11 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
         self.delete_namespace(ns_name)
         # wait for namespace to be deleted
-        # FIXME(itzikb) Set retries to 120 when BZ#1997120 is fixed
-        retries = 600
+        # FIXME(itzikb) Set retries to 24 when BZ#1997120 is fixed
+        retries = 120
         while True:
             try:
-                time.sleep(1)
+                time.sleep(5)
                 self.k8s_client.CoreV1Api().read_namespace(ns_name)
                 retries -= 1
                 self.assertNotEqual(0, retries,
