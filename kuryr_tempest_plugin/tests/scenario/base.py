@@ -48,12 +48,7 @@ KURYR_PORT_CRD_PLURAL = 'kuryrports'
 KURYR_LOAD_BALANCER_CRD_PLURAL = 'kuryrloadbalancers'
 K8S_ANNOTATION_PREFIX = 'openstack.org/kuryr'
 K8S_ANNOTATION_LBAAS_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-state'
-K8S_ANNOTATION_LBAAS_RT_STATE = K8S_ANNOTATION_PREFIX + '-lbaas-route-state'
-KURYR_ROUTE_DEL_VERIFY_TIMEOUT = 30
 KURYR_CONTROLLER = 'kuryr-controller'
-OS_ROUTES_API = 'route.openshift.io'
-OS_ROUTES_VERSION = 'v1'
-OS_ROUTES_PLURAL = "routes"
 
 
 class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
@@ -1279,96 +1274,6 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     'Kuryr controller is not in the %s state' % status
                 )
             retry_attempts -= 1
-
-    @classmethod
-    def create_route(cls, name, hostname, target_svc, namespace='default'):
-        route_manifest = {
-            'apiVersion': 'route.openshift.io/v1',
-            'kind': 'Route',
-            'metadata':
-                {
-                    'name': name,
-                },
-            'spec':
-                {
-                    'host': hostname,
-                    'to':
-                        {
-                            'kind': 'Service',
-                            'name': target_svc
-                        }
-                }
-        }
-
-        cls.k8s_client.CustomObjectsApi().create_namespaced_custom_object(
-            OS_ROUTES_API, OS_ROUTES_VERSION, namespace, OS_ROUTES_PLURAL,
-            route_manifest)
-
-        LOG.info("Route=%s created, wait for kuryr-annotation", name)
-        cls.wait_kuryr_annotation(
-            group=OS_ROUTES_API, version=OS_ROUTES_VERSION,
-            plural=OS_ROUTES_PLURAL,
-            annotation='openstack.org/kuryr-route-state', timeout_period=110,
-            name=name)
-        LOG.info("Found %s string in Route=%s annotation ",
-                 'openstack.org/kuryr-route-state', name)
-
-    @classmethod
-    def verify_route_endpoints_configured(cls, ep_name, namespace='default'):
-        cls._verify_endpoints_annotation(
-            ep_name=ep_name, ann_string=K8S_ANNOTATION_LBAAS_RT_STATE,
-            poll_interval=3)
-
-    @classmethod
-    def delete_route(cls, name, namespace='default'):
-        body = cls.k8s_client.V1DeleteOptions()
-        try:
-            cls.k8s_client.CustomObjectsApi().delete_namespaced_custom_object(
-                OS_ROUTES_API, OS_ROUTES_VERSION, namespace, OS_ROUTES_PLURAL,
-                name, body)
-        except kubernetes.client.rest.ApiException as e:
-            if e.status == 404:
-                return
-            raise
-
-        # FIXME(yboaron): Use other method (instead of constant delay)
-        # to verify that route was deleted
-        time.sleep(KURYR_ROUTE_DEL_VERIFY_TIMEOUT)
-
-    def verify_route_http(self, router_fip, hostname, amount,
-                          should_succeed=True):
-        LOG.info("Trying to curl the route, Router_FIP=%s, hostname=%s, "
-                 "should_succeed=%s", router_fip, hostname, should_succeed)
-
-        def req():
-            if should_succeed:
-                # FIXME(yboaron): From some reason for route use case,
-                # sometimes only one of service's pods is responding to CURL
-                # although all members and L7 policy were created at Octavia.
-                # so as workaround - I added a constant delay
-                time.sleep(1)
-
-            resp = requests.get('http://{}'.format(router_fip),
-                                headers={'Host': hostname})
-            return resp.status_code, resp.content
-
-        def pred(tester, responses):
-            contents = []
-            for resp in responses:
-                status_code, content = resp
-                if should_succeed:
-                    contents.append(content)
-                else:
-                    tester.assertEqual(requests.codes.SERVICE_UNAVAILABLE,
-                                       status_code)
-            if should_succeed:
-                unique_resps = set(contents)
-                tester.assertEqual(amount, len(unique_resps),
-                                   'Incorrect amount of unique backends. '
-                                   'Got {}'.format(unique_resps))
-
-        self._run_and_assert(
-            req, pred, retry_repetitions=consts.REPETITIONS_PER_BACKEND*amount)
 
     def create_and_ping_pod(self):
         name, pod = self.create_pod()
