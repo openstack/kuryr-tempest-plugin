@@ -50,7 +50,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         ready = False
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 sg_id, _, ready = self.get_np_crd_info(
                     name=network_policy_name, namespace=namespace)
                 if sg_id and ready:
@@ -95,7 +95,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
                             egress_cidrs_found))):
                 rules_match = True
 
-            time.sleep(1)
+            time.sleep(consts.NP_CHECK_SLEEP_TIME)
 
         if not rules_match:
             msg = 'Timed out waiting sg rules for np %s to match' % np
@@ -124,7 +124,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 sg_id, _, ready = self.get_np_crd_info(
                     network_policy_name, namespace=namespace_name)
                 if sg_id and ready:
@@ -206,7 +206,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 sg_id, _, _ = self.get_np_crd_info(network_policy_name,
                                                    namespace=namespace_name)
                 if sg_id:
@@ -247,7 +247,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 self.get_np_crd_info(network_policy_name,
                                      namespace=namespace_name)
             except kubernetes.client.rest.ApiException as e:
@@ -277,7 +277,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 sg_id, _, _ = self.get_np_crd_info(network_policy_name)
                 if sg_id:
                     break
@@ -291,7 +291,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         self.delete_network_policy(network_policy_name)
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
-            time.sleep(1)
+            time.sleep(consts.NP_CHECK_SLEEP_TIME)
             if network_policy_name in self.list_network_policies():
                 continue
             try:
@@ -320,7 +320,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 _, crd_pod_selector, _ = self.get_np_crd_info(
                     network_policy_name)
                 if crd_pod_selector:
@@ -341,7 +341,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 _, crd_pod_selector, _ = self.get_np_crd_info(
                     network_policy_name)
                 labels = crd_pod_selector.get('matchLabels')
@@ -368,7 +368,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 sg_id, _, _ = self.get_np_crd_info(network_policy_name,
                                                    namespace=ns_name)
                 if sg_id:
@@ -384,7 +384,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         self.delete_namespace(ns_name)
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
-            time.sleep(1)
+            time.sleep(consts.NP_CHECK_SLEEP_TIME)
             if network_policy_name in self.list_network_policies(
                     namespace=ns_name):
                 continue
@@ -398,7 +398,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
             sg_ids_after = [sg['id'] for sg in sgs_after]
             if sg_id not in sg_ids_after:
                 break
-            time.sleep(1)
+            time.sleep(consts.NP_CHECK_SLEEP_TIME)
         if time.time() - start >= TIMEOUT_PERIOD:
             raise lib_exc.TimeoutException('Sec group ID still exists')
 
@@ -416,7 +416,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
             try:
-                time.sleep(1)
+                time.sleep(consts.NP_CHECK_SLEEP_TIME)
                 sg_id, _, _ = self.get_np_crd_info(network_policy_name,
                                                    namespace=ns_name)
                 if sg_id:
@@ -430,7 +430,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
         self.delete_network_policy(network_policy_name, namespace=ns_name)
         start = time.time()
         while time.time() - start < TIMEOUT_PERIOD:
-            time.sleep(1)
+            time.sleep(consts.NP_CHECK_SLEEP_TIME)
             if network_policy_name in self.list_network_policies(
                     namespace=ns_name):
                 continue
@@ -444,7 +444,7 @@ class TestNetworkPolicyScenario(base.BaseKuryrScenarioTest,
             sg_ids_after = [sg['id'] for sg in sgs_after]
             if sg_id not in sg_ids_after:
                 break
-            time.sleep(1)
+            time.sleep(consts.NP_CHECK_SLEEP_TIME)
         if time.time() - start >= TIMEOUT_PERIOD:
             raise lib_exc.TimeoutException('Sec group ID still exists')
 
