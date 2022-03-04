@@ -358,7 +358,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
 
     def exec_command_in_pod(self, pod_name, command, namespace="default",
                             stderr=False, container=None,
-                            req_timeout=60, f_timeout=2):
+                            req_timeout=60, f_timeout=10):
         api = self.k8s_client.CoreV1Api()
         kwargs = dict(command=command, stdin=False, stdout=True, tty=False,
                       stderr=stderr)
