@@ -213,10 +213,16 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     def delete_pod(cls, pod_name, body=None, namespace="default"):
         if body is None:
             body = {}
-        cls.k8s_client.CoreV1Api().delete_namespaced_pod(
-            name=pod_name,
-            body=body,
-            namespace=namespace)
+        try:
+            cls.k8s_client.CoreV1Api().delete_namespaced_pod(
+                name=pod_name,
+                body=body,
+                namespace=namespace)
+        except kubernetes.client.exceptions.ApiException as e:
+            if e.status == 404:
+                LOG.debug(f"Pod {pod_name} was not found.")
+            else:
+                raise
         # TODO(apuimedo) This sleep to be replaced with a polling with
         # timeout for the pod object to be gone from k8s api.
         time.sleep(30)

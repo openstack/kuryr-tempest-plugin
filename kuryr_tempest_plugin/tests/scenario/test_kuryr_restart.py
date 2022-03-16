@@ -18,8 +18,8 @@ from tempest import config
 from tempest.lib import decorators
 from tempest.lib import exceptions as lib_exc
 
-
 from kuryr_tempest_plugin.tests.scenario import base
+from kuryr_tempest_plugin.tests.scenario import consts
 
 CONF = config.CONF
 
@@ -39,6 +39,9 @@ class TestKuryrRestartScenario(base.BaseKuryrScenarioTest):
     def test_kuryr_pod_delete(self):
         # find kuryr CNI and controller pods, delete them one by one and create
         #  a regular pod just after removal
+        client_pod_name, pod = self.create_pod()
+        self.addCleanup(self.delete_pod, client_pod_name)
+
         kube_system_pods = self.get_pod_name_list(
             namespace=CONF.kuryr_kubernetes.kube_system_namespace)
         for kuryr_pod_name in kube_system_pods:
@@ -65,11 +68,15 @@ class TestKuryrRestartScenario(base.BaseKuryrScenarioTest):
                 # Check once for controller kuryr pod and once for CNI pod
                 pod_name, pod = self.create_pod()
                 self.addCleanup(self.delete_pod, pod_name)
-                pod_fip = self.assign_fip_to_pod(pod_name)
-                self.assertIsNotNone(pod_fip['floatingip'][
-                    'floating_ip_address'])
-                self.assertTrue(self.ping_ip_address(pod_fip[
-                    'floatingip']['floating_ip_address']))
+                dst_pod_ip = self.get_pod_ip(pod_name)
+                curl_tmpl = self.get_curl_template(dst_pod_ip,
+                                                   extra_args='-m 10',
+                                                   port=8080)
+                cmd = ["/bin/sh", "-c", curl_tmpl.format(dst_pod_ip, ':8080')]
+                self.assertIn(consts.POD_OUTPUT, self.exec_command_in_pod(
+                    client_pod_name, cmd),
+                    "Connectivity from %s to pod with ip %s failed." % (
+                    client_pod_name, dst_pod_ip))
 
         # Check that both kuryr-pods are up and running
         # The newly created pods are running because create_pod is written
