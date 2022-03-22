@@ -219,13 +219,22 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 body=body,
                 namespace=namespace)
         except kubernetes.client.exceptions.ApiException as e:
-            if e.status == 404:
-                LOG.debug(f"Pod {pod_name} was not found.")
-            else:
+            if e.status != 404:
                 raise
-        # TODO(apuimedo) This sleep to be replaced with a polling with
-        # timeout for the pod object to be gone from k8s api.
-        time.sleep(30)
+            LOG.debug("Pod %s was not found.", pod_name)
+        retries = 6
+        while retries > 0:
+            try:
+                cls.k8s_client.CoreV1Api().read_namespaced_pod(
+                    pod_name,
+                    namespace)
+                time.sleep(5)
+            except kubernetes.client.exceptions.ApiException as e:
+                if e.status != 404:
+                    LOG.warning("An exception occured: %s", e)
+                break
+        else:
+            LOG.debug("Timeout - Pod %s has not been deleted yet.", pod_name)
 
     @classmethod
     def wait_for_pod_status(cls, pod_name, namespace="default",
