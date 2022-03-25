@@ -54,10 +54,17 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                 'ports_pool_update_frequency'])
 
     def get_subnet_id_for_ns(self, namespace_name):
-        subnet_name = 'ns/' + namespace_name + '-subnet'
+        subnet_name = namespace_name
         subnets_list = self.os_admin.subnets_client.list_subnets()
         subnet_id = [n['id'] for n in subnets_list['subnets']
-                     if n['name'] == subnet_name][0]
+                     if n['name'] == subnet_name]
+        if subnet_id:
+            subnet_id = subnet_id[0]
+        else:
+            subnet_name = f'ns/{namespace_name}-subnet'
+            subnet_id = [n['id'] for n in subnets_list['subnets']
+                         if n['name'] == subnet_name][0]
+
         return subnet_id
 
     def check_initial_ports_num(self, subnet_id, namespace_name, pool_batch):
