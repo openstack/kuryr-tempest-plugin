@@ -890,7 +890,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         return False
 
     @classmethod
-    def create_namespace(cls, name=None, labels=None,
+    def create_namespace(cls, name=None, labels=None, annotations=None,
                          wait_for_crd=True,
                          timeout_period=consts.NS_TIMEOUT):
         if CONF.kuryr_kubernetes.trigger_namespace_upon_pod:
@@ -898,8 +898,8 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-namespace')
         namespace = cls.k8s_client.V1Namespace()
-        namespace.metadata = cls.k8s_client.V1ObjectMeta(name=name,
-                                                         labels=labels)
+        namespace.metadata = cls.k8s_client.V1ObjectMeta(
+            name=name, labels=labels, annotations=annotations)
         namespace_obj = cls.k8s_client.CoreV1Api().create_namespace(
             body=namespace)
 
@@ -995,6 +995,33 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
             namespace=namespace, plural=KURYR_LOAD_BALANCER_CRD_PLURAL,
             name=name)
+
+    @classmethod
+    def wait_for_kuryr_resource(cls, namespace, resource_kind, name,
+                                status_key=None):
+        start = time.time()
+        while time.time() - start < consts.KURYR_RESOURCE_CHECK_TIMEOUT:
+            time.sleep(5)
+            try:
+                resource_crd = cls.k8s_client.CustomObjectsApi(
+                    ).get_namespaced_custom_object(
+                        group=KURYR_CRD_GROUP, version=KURYR_CRD_VERSION,
+                        namespace=namespace, plural=resource_kind, name=name)
+            except kubernetes.client.rest.ApiException:
+                continue
+            if not status_key:
+                return resource_crd
+            try:
+                if resource_crd['status'][status_key]:
+                    return resource_crd
+                continue
+            except KeyError:
+                continue
+        msg = ("Timed out waiting for %(resource_kind)s/%(resource_name)s "
+               "status %(status_key)s" % {"resource_kind": resource_kind,
+                                          "resource_name": name,
+                                          "status_key": status_key})
+        raise lib_exc.TimeoutException(msg)
 
     @classmethod
     def get_pod_list(cls, namespace='default', label_selector=''):

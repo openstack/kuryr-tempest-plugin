@@ -113,5 +113,8 @@ kuryr_k8s_opts = [
     cfg.BoolOpt("trigger_namespace_upon_pod", default=False,
                 help="Whether or not Namespace should be handled upon Pod "
                 "creation"),
+    cfg.BoolOpt("annotation_project_driver", default=False,
+                help="Whether or not annotation project tests will be "
+                     "running"),
 
 ]
