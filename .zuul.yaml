@@ -20,10 +20,15 @@
       - kuryr-kubernetes-tempest-jobs
     check:
       jobs:
+        - kuryr-kubernetes-tempest-yoga
         - kuryr-kubernetes-tempest-xena
         - kuryr-kubernetes-tempest-wallaby
         - kuryr-kubernetes-tempest-victoria
-        - kuryr-kubernetes-tempest-ussuri
+
+- job:
+    name: kuryr-kubernetes-tempest-yoga
+    parent: kuryr-kubernetes-tempest
+    override-checkout: stable/yoga
 
 - job:
     name: kuryr-kubernetes-tempest-xena
@@ -39,9 +44,3 @@
     name: kuryr-kubernetes-tempest-victoria
     parent: kuryr-kubernetes-tempest
     override-checkout: stable/victoria
-
-- job:
-    name: kuryr-kubernetes-tempest-ussuri
-    parent: kuryr-kubernetes-tempest
-    override-checkout: stable/ussuri
-    nodeset: openstack-single-node-bionic
