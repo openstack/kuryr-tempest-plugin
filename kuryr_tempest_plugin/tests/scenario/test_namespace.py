@@ -58,11 +58,14 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         pod_name, pod = self.create_pod(labels={"app": 'pod-label'},
                                         namespace=namespace_name)
 
-        subnet_name = 'ns/' + namespace_name + '-subnet'
         kuryr_net_crd_name = 'ns-' + namespace_name
 
         seen_subnets = self.os_admin.subnets_client.list_subnets()
         seen_subnet_names = [n['name'] for n in seen_subnets['subnets']]
+
+        subnet_name = namespace_name
+        if subnet_name not in seen_subnet_names:
+            subnet_name = 'ns/' + namespace_name + '-subnet'
 
         self.assertIn(subnet_name, seen_subnet_names)
 
@@ -147,6 +150,12 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         self.assertIn(consts.POD_OUTPUT,
                       self.exec_command_in_pod(pod_nsdefault_name, cmd))
 
+        seen_subnets = self.os_admin.subnets_client.list_subnets()
+        if subnet_ns1_name not in seen_subnets:
+            subnet_ns1_name = f'ns/{ns1_name}-subnet'
+        if subnet_ns2_name not in seen_subnets:
+            subnet_ns2_name = f'ns/{ns2_name}-subnet'
+
         self._delete_namespace_resources(ns1_name, net_crd_ns1,
                                          subnet_ns1_name)
         self._delete_namespace_resources(ns2_name, net_crd_ns2,
@@ -154,7 +163,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
 
     def _get_and_check_ns_resources(self, ns_name, existing_namespaces,
                                     existing_sgs):
-        subnet_ns_name = 'ns/' + ns_name + '-subnet'
+        subnet_ns_name = ns_name
         net_crd_ns_name = 'ns-' + ns_name
         self.assertIn(ns_name, existing_namespaces)
 
@@ -243,6 +252,12 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
                       self.exec_command_in_pod(pod_ns1_name, cmd, ns1_name))
 
         # Check resources are deleted
+        seen_subnets = self.os_admin.subnets_client.list_subnets()
+        if subnet_ns1_name not in seen_subnets:
+            subnet_ns1_name = f'ns/{ns1_name}-subnet'
+        if subnet_ns2_name not in seen_subnets:
+            subnet_ns2_name = f'ns/{ns2_name}-subnet'
+
         self._delete_namespace_resources(ns1_name, net_crd_ns1,
                                          subnet_ns1_name)
         self._delete_namespace_resources(ns2_name, net_crd_ns2,
