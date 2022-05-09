@@ -49,6 +49,7 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
         self.namespaces.append(namespace)
+        ns_uid = namespace.metadata.uid
 
         existing_namespaces = [ns.metadata.name
                                for ns in self.list_namespaces().items]
@@ -63,9 +64,11 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_subnets = self.os_admin.subnets_client.list_subnets()
         seen_subnet_names = [n['name'] for n in seen_subnets['subnets']]
 
-        subnet_name = namespace_name
+        subnet_name = (f"{ns_uid}/{namespace_name}")
         if subnet_name not in seen_subnet_names:
             subnet_name = 'ns/' + namespace_name + '-subnet'
+            if subnet_name not in seen_subnet_names:
+                subnet_name = namespace_name
 
         self.assertIn(subnet_name, seen_subnet_names)
 
@@ -112,9 +115,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_sg_ids = [sg['id'] for sg in seen_sgs]
 
         subnet_ns1_name, net_crd_ns1 = self._get_and_check_ns_resources(
-            ns1_name, existing_namespaces, seen_sg_ids)
+            ns1, existing_namespaces, seen_sg_ids)
         subnet_ns2_name, net_crd_ns2 = self._get_and_check_ns_resources(
-            ns2_name, existing_namespaces, seen_sg_ids)
+            ns2, existing_namespaces, seen_sg_ids)
         self.assertIn('default', existing_namespaces)
 
         # Create pods in different namespaces
@@ -153,17 +156,24 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_subnets = self.os_admin.subnets_client.list_subnets()
         if subnet_ns1_name not in seen_subnets:
             subnet_ns1_name = f'ns/{ns1_name}-subnet'
+            if subnet_ns1_name not in seen_subnets:
+                subnet_ns1_name = ns1_name
         if subnet_ns2_name not in seen_subnets:
             subnet_ns2_name = f'ns/{ns2_name}-subnet'
+            if subnet_ns2_name not in seen_subnets:
+                subnet_ns2_name = ns2_name
 
         self._delete_namespace_resources(ns1_name, net_crd_ns1,
                                          subnet_ns1_name)
         self._delete_namespace_resources(ns2_name, net_crd_ns2,
                                          subnet_ns2_name)
 
-    def _get_and_check_ns_resources(self, ns_name, existing_namespaces,
+    def _get_and_check_ns_resources(self, ns, existing_namespaces,
                                     existing_sgs):
-        subnet_ns_name = ns_name
+        ns_name = ns.metadata.name
+        ns_uid = ns.metadata.name
+        subnet_ns_name = f'{ns_uid}/{ns_name}'
+
         net_crd_ns_name = 'ns-' + ns_name
         self.assertIn(ns_name, existing_namespaces)
 
@@ -209,9 +219,9 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_sg_ids = [sg['id'] for sg in seen_sgs]
 
         subnet_ns1_name, net_crd_ns1 = self._get_and_check_ns_resources(
-            ns1_name, existing_namespaces, seen_sg_ids)
+            ns1, existing_namespaces, seen_sg_ids)
         subnet_ns2_name, net_crd_ns2 = self._get_and_check_ns_resources(
-            ns2_name, existing_namespaces, seen_sg_ids)
+            ns2, existing_namespaces, seen_sg_ids)
         self.assertIn('default', existing_namespaces)
 
         pod_nsdefault_name, pod_nsdefault = self.create_pod(
@@ -255,8 +265,12 @@ class TestNamespaceScenario(base.BaseKuryrScenarioTest):
         seen_subnets = self.os_admin.subnets_client.list_subnets()
         if subnet_ns1_name not in seen_subnets:
             subnet_ns1_name = f'ns/{ns1_name}-subnet'
+            if subnet_ns1_name not in seen_subnets:
+                subnet_ns1_name = ns1_name
         if subnet_ns2_name not in seen_subnets:
             subnet_ns2_name = f'ns/{ns2_name}-subnet'
+            if subnet_ns2_name not in seen_subnets:
+                subnet_ns2_name = ns2_name
 
         self._delete_namespace_resources(ns1_name, net_crd_ns1,
                                          subnet_ns1_name)
