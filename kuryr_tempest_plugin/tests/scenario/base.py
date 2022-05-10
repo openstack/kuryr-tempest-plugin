@@ -594,6 +594,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
         while time.time() - start < CONF.kuryr_kubernetes.lb_build_timeout:
             time.sleep(5)
             service = api.read_namespaced_service(service_name, namespace)
+            crd_lb_ip = None
             if service.status.load_balancer.ingress:
                 try:
                     klb_crd = cls.get_kuryr_loadbalancer_crds(
