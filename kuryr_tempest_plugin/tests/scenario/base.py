@@ -218,7 +218,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                 name=pod_name,
                 body=body,
                 namespace=namespace)
-        except kubernetes.client.exceptions.ApiException as e:
+        except kubernetes.client.rest.ApiException as e:
             if e.status != 404:
                 raise
             LOG.debug("Pod %s was not found.", pod_name)
@@ -229,7 +229,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
                     pod_name,
                     namespace)
                 time.sleep(5)
-            except kubernetes.client.exceptions.ApiException as e:
+            except kubernetes.client.rest.ApiException as e:
                 if e.status != 404:
                     LOG.warning("An exception occured: %s", e)
                 break
