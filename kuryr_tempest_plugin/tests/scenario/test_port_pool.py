@@ -53,19 +53,20 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
                 'ports_pool_batch', 'ports_pool_min', 'ports_pool_max',
                 'ports_pool_update_frequency'])
 
-    def get_subnet_id_for_ns(self, namespace_name):
-        subnet_name = namespace_name
+    def get_subnet_id_for_ns(self, namespace):
         subnets_list = self.os_admin.subnets_client.list_subnets()
-        subnet_id = [n['id'] for n in subnets_list['subnets']
-                     if n['name'] == subnet_name]
-        if subnet_id:
-            subnet_id = subnet_id[0]
-        else:
-            subnet_name = f'ns/{namespace_name}-subnet'
-            subnet_id = [n['id'] for n in subnets_list['subnets']
-                         if n['name'] == subnet_name][0]
+        ns_name = namespace.metadata.name
+        ns_uid = namespace.metadata.uid
 
-        return subnet_id
+        for subnet_name in (f'{ns_name}/{ns_uid}',
+                            f'ns/{ns_name}-subnet',
+                            ns_name):
+            subnet_id = [n['id'] for n in subnets_list['subnets']
+                         if n['name'] == subnet_name]
+            if subnet_id:
+                return subnet_id[0]
+
+        return None
 
     def check_initial_ports_num(self, subnet_id, namespace_name, pool_batch):
         # check the original length of list of ports for new ns
@@ -105,9 +106,9 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
             # create a pod to test the port pool increase
             pod_name1, _ = self.create_pod(namespace=namespace_name,
                                            labels={'type': 'demo'})
-            subnet_id = self.get_subnet_id_for_ns(namespace_name)
+            subnet_id = self.get_subnet_id_for_ns(namespace)
         else:
-            subnet_id = self.get_subnet_id_for_ns(namespace_name)
+            subnet_id = self.get_subnet_id_for_ns(namespace)
             port_list_num = self.check_initial_ports_num(subnet_id,
                                                          namespace_name,
                                                          pool_batch)
@@ -190,7 +191,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+        subnet_id = self.get_subnet_id_for_ns(namespace)
         self.update_config_map_ini_section_and_restart(
             name=self.CONFIG_MAP_NAME,
             conf_to_update=self.CONF_TO_UPDATE,
@@ -253,7 +254,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+        subnet_id = self.get_subnet_id_for_ns(namespace)
 
         # Read the value of the drivers
         update_pools_vif_drivers = self.get_config_map_ini_value(
@@ -348,7 +349,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         # Check resources are created
         namespace_name, namespace = self.create_namespace()
         self.addCleanup(self.delete_namespace, namespace_name)
-        subnet_id = self.get_subnet_id_for_ns(namespace_name)
+        subnet_id = self.get_subnet_id_for_ns(namespace)
 
         self.update_config_map_ini_section_and_restart(
             name=self.CONFIG_MAP_NAME,
