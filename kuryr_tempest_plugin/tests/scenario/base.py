@@ -1652,6 +1652,8 @@ class BaseReconciliationScenarioTest(BaseKuryrScenarioTest):
                     new_resource_id = listeners[0].get('id')
                 else:
                     new_resource_id = status.get(resource, {}).get('id')
+                if new_resource_id is None:
+                    continue
                 new_lb_members = status.get('members', [])
                 if (new_resource_id == resource_id or new_resource_id is None
                         or len(svc_pods) != len(new_lb_members)):
