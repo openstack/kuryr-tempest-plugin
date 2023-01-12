@@ -61,6 +61,7 @@ class TestPortPoolScenario(base.BaseKuryrScenarioTest):
         for subnet_name in (f'{ns_uid}/{ns_name}',
                             f'{ns_name}/{ns_uid}',
                             f'{ns_name}-subnet',
+                            f'ns/{ns_name}-subnet',
                             ns_name):
             subnet_id = [n['id'] for n in subnets_list['subnets']
                          if n['name'] == subnet_name]
