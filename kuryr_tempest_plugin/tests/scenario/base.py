@@ -167,17 +167,31 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
     @classmethod
     def create_pod(cls, name=None, labels=None, image='quay.io/kuryr/demo',
                    namespace="default", annotations=None, wait_for_status=True,
-                   affinity=None):
+                   affinity=None, pod_security=True):
         if not name:
             name = data_utils.rand_name(prefix='kuryr-pod')
         pod = cls.k8s_client.V1Pod()
         pod.metadata = cls.k8s_client.V1ObjectMeta(name=name, labels=labels,
                                                    annotations=annotations)
 
-        container = kubernetes.client.V1Container(
-            name=name, image=image, image_pull_policy='IfNotPresent')
+        security_context = None
+        security_context_container = None
 
-        spec = cls.k8s_client.V1PodSpec(containers=[container])
+        if CONF.kuryr_kubernetes.set_pod_security_context and pod_security:
+            seccomp_profile = cls.k8s_client.V1SeccompProfile(
+                type='RuntimeDefault')
+            capabilities = cls.k8s_client.V1Capabilities(
+                drop=['ALL'], add=["NET_BIND_SERVICE"])
+            security_context_container = cls.k8s_client.V1SecurityContext(
+                allow_privilege_escalation=False, capabilities=capabilities)
+            security_context = cls.k8s_client.V1PodSecurityContext(
+                run_as_non_root=True, seccomp_profile=seccomp_profile)
+        container = kubernetes.client.V1Container(
+            name=name, image=image,
+            image_pull_policy='IfNotPresent',
+            security_context=security_context_container)
+        spec = cls.k8s_client.V1PodSpec(containers=[container],
+                                        security_context=security_context)
 
         pod.spec = spec
         pod.spec.affinity = affinity
@@ -785,7 +799,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             if protocol == "SCTP":
                 pod_name, pod = cls.create_pod(
                     labels={"app": label}, image='quay.io/kuryr/sctp-demo',
-                    namespace=namespace)
+                    namespace=namespace, pod_security=False)
             else:
                 pod_name, pod = cls.create_pod(
                     labels={"app": label}, namespace=namespace)
@@ -1465,7 +1479,7 @@ class BaseKuryrScenarioTest(manager.NetworkScenarioTest):
             if protocol == "SCTP":
                 pod_name, _ = self.create_pod(
                     labels=labels, image='quay.io/kuryr/sctp-demo',
-                    namespace=namespace)
+                    namespace=namespace, pod_security=False)
             else:
                 pod_name, _ = self.create_pod(
                     namespace=namespace, labels=labels)
