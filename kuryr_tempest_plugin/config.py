@@ -118,5 +118,8 @@ kuryr_k8s_opts = [
     cfg.BoolOpt("annotation_project_driver", default=False,
                 help="Whether or not annotation project tests will be "
                      "running"),
+    cfg.BoolOpt("set_pod_security_context", default=False,
+                help="Whether or not to set security context for Kuryr demo "
+                     "pods"),
 
 ]
