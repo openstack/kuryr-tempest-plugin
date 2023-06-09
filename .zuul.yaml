@@ -20,10 +20,17 @@
       - kuryr-kubernetes-tempest-jobs
     check:
       jobs:
+        - kuryr-kubernetes-tempest-2023-1
         - kuryr-kubernetes-tempest-zed
         - kuryr-kubernetes-tempest-yoga
         - kuryr-kubernetes-tempest-xena
         - kuryr-kubernetes-tempest-wallaby
+
+- job:
+    name: kuryr-kubernetes-tempest-2023-1
+    parent: kuryr-kubernetes-tempest
+    nodeset: openstack-single-node-jammy
+    override-checkout: stable/2023.1
 
 - job:
     name: kuryr-kubernetes-tempest-zed
