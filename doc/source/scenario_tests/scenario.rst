@@ -1,1 +1,0 @@
-../../../kuryr_tempest_plugin/tests/scenario/README.rst
